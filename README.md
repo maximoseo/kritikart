@@ -4,6 +4,8 @@ A 3D arcade kart-racing game built on **Godot 4.7.2** (Jolt Physics, Forward+ on
 Mobile renderer on Android/Web). Created with Summer Engine's `3d-racing-game` template,
 then customized for the KritiKart project.
 
+**Play the web build:** https://kritikart.maximo-seo.ai — Android APK in [Releases](../../releases).
+
 ## Gameplay (v0.1.0)
 
 - 3-lap races, **6 racers** (player + 5 AI opponents with distinct personalities)
