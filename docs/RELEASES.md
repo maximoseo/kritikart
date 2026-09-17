@@ -5,7 +5,7 @@ for what was released, when, and its verified hash.
 
 | Version | Date (UTC) | Artifact | sha256 | Notes |
 |---|---|---|---|---|
-| 0.1.0 | pending | build/kritikart.apk (Android arm64, signed) | pending | First release: 6 racers, 3 laps, Storm Coast, difficulty tiers |
+| 0.1.0 | 2026-09-17 | builds/kritikart-v0.1.0-android-arm64.apk (Android arm64-v8a, signed) | eef26f87b4e5461cf513a0b91406cb05174e90228e99345bdbb8888056a225bb | First release: 6 racers, 3 laps, Storm Coast, difficulty tiers, Supabase leaderboards (RLS), minSdk 24, INTERNET permission |
 
 ## Format rules
 

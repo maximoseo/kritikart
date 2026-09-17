@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dq8qlm0kmwkji"
 path.s3tc="res://.godot/imported/customizable_hypercar_model3_Image_0.jpg-e64efa01a5a36e81328f00c873612aa0.s3tc.ctex"
+path.etc2="res://.godot/imported/customizable_hypercar_model3_Image_0.jpg-e64efa01a5a36e81328f00c873612aa0.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cars/customizable_hypercar_model3_Image_0.jpg"
-dest_files=["res://.godot/imported/customizable_hypercar_model3_Image_0.jpg-e64efa01a5a36e81328f00c873612aa0.s3tc.ctex"]
+dest_files=["res://.godot/imported/customizable_hypercar_model3_Image_0.jpg-e64efa01a5a36e81328f00c873612aa0.s3tc.ctex", "res://.godot/imported/customizable_hypercar_model3_Image_0.jpg-e64efa01a5a36e81328f00c873612aa0.etc2.ctex"]
 
 [params]
 

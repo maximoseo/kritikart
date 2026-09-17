@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://detma2hcpt1hs"
 path.s3tc="res://.godot/imported/vanta_r49_0.png-b9c68fc02f4f36d5559df03f6301a54b.s3tc.ctex"
+path.etc2="res://.godot/imported/vanta_r49_0.png-b9c68fc02f4f36d5559df03f6301a54b.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/vehicles/vanta_r49/vanta_r49_0.png"
-dest_files=["res://.godot/imported/vanta_r49_0.png-b9c68fc02f4f36d5559df03f6301a54b.s3tc.ctex"]
+dest_files=["res://.godot/imported/vanta_r49_0.png-b9c68fc02f4f36d5559df03f6301a54b.s3tc.ctex", "res://.godot/imported/vanta_r49_0.png-b9c68fc02f4f36d5559df03f6301a54b.etc2.ctex"]
 
 [params]
 

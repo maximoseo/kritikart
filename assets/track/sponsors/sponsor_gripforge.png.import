@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://di5bg8dm48jwu"
 path.s3tc="res://.godot/imported/sponsor_gripforge.png-b30b71d5c2fb04f137df1f70311fffa7.s3tc.ctex"
+path.etc2="res://.godot/imported/sponsor_gripforge.png-b30b71d5c2fb04f137df1f70311fffa7.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/track/sponsors/sponsor_gripforge.png"
-dest_files=["res://.godot/imported/sponsor_gripforge.png-b30b71d5c2fb04f137df1f70311fffa7.s3tc.ctex"]
+dest_files=["res://.godot/imported/sponsor_gripforge.png-b30b71d5c2fb04f137df1f70311fffa7.s3tc.ctex", "res://.godot/imported/sponsor_gripforge.png-b30b71d5c2fb04f137df1f70311fffa7.etc2.ctex"]
 
 [params]
 

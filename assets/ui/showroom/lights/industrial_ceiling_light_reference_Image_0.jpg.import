@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b2l3x30mwp8h7"
 path.s3tc="res://.godot/imported/industrial_ceiling_light_reference_Image_0.jpg-1bb40a4ba5562bc15ef5d39ca581ed07.s3tc.ctex"
+path.etc2="res://.godot/imported/industrial_ceiling_light_reference_Image_0.jpg-1bb40a4ba5562bc15ef5d39ca581ed07.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/ui/showroom/lights/industrial_ceiling_light_reference_Image_0.jpg"
-dest_files=["res://.godot/imported/industrial_ceiling_light_reference_Image_0.jpg-1bb40a4ba5562bc15ef5d39ca581ed07.s3tc.ctex"]
+dest_files=["res://.godot/imported/industrial_ceiling_light_reference_Image_0.jpg-1bb40a4ba5562bc15ef5d39ca581ed07.s3tc.ctex", "res://.godot/imported/industrial_ceiling_light_reference_Image_0.jpg-1bb40a4ba5562bc15ef5d39ca581ed07.etc2.ctex"]
 
 [params]
 

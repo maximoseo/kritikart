@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dh8187mjq2adb"
 path.s3tc="res://.godot/imported/sponsor_neon_vector.png-85dc07d300ec209ac46782085550bece.s3tc.ctex"
+path.etc2="res://.godot/imported/sponsor_neon_vector.png-85dc07d300ec209ac46782085550bece.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/track/sponsors/sponsor_neon_vector.png"
-dest_files=["res://.godot/imported/sponsor_neon_vector.png-85dc07d300ec209ac46782085550bece.s3tc.ctex"]
+dest_files=["res://.godot/imported/sponsor_neon_vector.png-85dc07d300ec209ac46782085550bece.s3tc.ctex", "res://.godot/imported/sponsor_neon_vector.png-85dc07d300ec209ac46782085550bece.etc2.ctex"]
 
 [params]
 

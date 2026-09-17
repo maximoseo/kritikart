@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://qmuyhxarvloa"
 path.s3tc="res://.godot/imported/storm_coast_floodlight_camera_post_hunyuan_texture_20250901.png-956192d2433fb6fcae4be88a34c303a2.s3tc.ctex"
+path.etc2="res://.godot/imported/storm_coast_floodlight_camera_post_hunyuan_texture_20250901.png-956192d2433fb6fcae4be88a34c303a2.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/environment/storm_coast_floodlight_camera_post_hunyuan_texture_20250901.png"
-dest_files=["res://.godot/imported/storm_coast_floodlight_camera_post_hunyuan_texture_20250901.png-956192d2433fb6fcae4be88a34c303a2.s3tc.ctex"]
+dest_files=["res://.godot/imported/storm_coast_floodlight_camera_post_hunyuan_texture_20250901.png-956192d2433fb6fcae4be88a34c303a2.s3tc.ctex", "res://.godot/imported/storm_coast_floodlight_camera_post_hunyuan_texture_20250901.png-956192d2433fb6fcae4be88a34c303a2.etc2.ctex"]
 
 [params]
 

@@ -24,6 +24,7 @@ export_credentials.cfg
 downloads/
 node_modules/
 build/
+builds/
 
 # Godot/Summer generated editor cache
 .godot/

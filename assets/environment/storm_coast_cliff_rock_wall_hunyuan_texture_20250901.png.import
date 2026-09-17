@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://b2qfq00qasyge"
 path.s3tc="res://.godot/imported/storm_coast_cliff_rock_wall_hunyuan_texture_20250901.png-252ad7ebb60df3320f7c93e916683855.s3tc.ctex"
+path.etc2="res://.godot/imported/storm_coast_cliff_rock_wall_hunyuan_texture_20250901.png-252ad7ebb60df3320f7c93e916683855.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/environment/storm_coast_cliff_rock_wall_hunyuan_texture_20250901.png"
-dest_files=["res://.godot/imported/storm_coast_cliff_rock_wall_hunyuan_texture_20250901.png-252ad7ebb60df3320f7c93e916683855.s3tc.ctex"]
+dest_files=["res://.godot/imported/storm_coast_cliff_rock_wall_hunyuan_texture_20250901.png-252ad7ebb60df3320f7c93e916683855.s3tc.ctex", "res://.godot/imported/storm_coast_cliff_rock_wall_hunyuan_texture_20250901.png-252ad7ebb60df3320f7c93e916683855.etc2.ctex"]
 
 [params]
 

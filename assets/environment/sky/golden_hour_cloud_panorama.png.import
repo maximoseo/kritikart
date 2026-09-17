@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://da5gcfe3pqr2i"
 path.s3tc="res://.godot/imported/golden_hour_cloud_panorama.png-a99e7ba8692dd46ded68935c058e127e.s3tc.ctex"
+path.etc2="res://.godot/imported/golden_hour_cloud_panorama.png-a99e7ba8692dd46ded68935c058e127e.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/environment/sky/golden_hour_cloud_panorama.png"
-dest_files=["res://.godot/imported/golden_hour_cloud_panorama.png-a99e7ba8692dd46ded68935c058e127e.s3tc.ctex"]
+dest_files=["res://.godot/imported/golden_hour_cloud_panorama.png-a99e7ba8692dd46ded68935c058e127e.s3tc.ctex", "res://.godot/imported/golden_hour_cloud_panorama.png-a99e7ba8692dd46ded68935c058e127e.etc2.ctex"]
 
 [params]
 

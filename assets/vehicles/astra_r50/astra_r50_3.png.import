@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cv1cjxckvg24k"
 path.s3tc="res://.godot/imported/astra_r50_3.png-3bf846710b048aef9672c2bd9f9b2e48.s3tc.ctex"
+path.etc2="res://.godot/imported/astra_r50_3.png-3bf846710b048aef9672c2bd9f9b2e48.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/vehicles/astra_r50/astra_r50_3.png"
-dest_files=["res://.godot/imported/astra_r50_3.png-3bf846710b048aef9672c2bd9f9b2e48.s3tc.ctex"]
+dest_files=["res://.godot/imported/astra_r50_3.png-3bf846710b048aef9672c2bd9f9b2e48.s3tc.ctex", "res://.godot/imported/astra_r50_3.png-3bf846710b048aef9672c2bd9f9b2e48.etc2.ctex"]
 
 [params]
 

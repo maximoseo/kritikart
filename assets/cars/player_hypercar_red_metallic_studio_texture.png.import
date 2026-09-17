@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bboowqlb5v8bm"
 path.s3tc="res://.godot/imported/player_hypercar_red_metallic_studio_texture.png-d3fc80069092a01890bdd573e2b7789f.s3tc.ctex"
+path.etc2="res://.godot/imported/player_hypercar_red_metallic_studio_texture.png-d3fc80069092a01890bdd573e2b7789f.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/cars/player_hypercar_red_metallic_studio_texture.png"
-dest_files=["res://.godot/imported/player_hypercar_red_metallic_studio_texture.png-d3fc80069092a01890bdd573e2b7789f.s3tc.ctex"]
+dest_files=["res://.godot/imported/player_hypercar_red_metallic_studio_texture.png-d3fc80069092a01890bdd573e2b7789f.s3tc.ctex", "res://.godot/imported/player_hypercar_red_metallic_studio_texture.png-d3fc80069092a01890bdd573e2b7789f.etc2.ctex"]
 
 [params]
 

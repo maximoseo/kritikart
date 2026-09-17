@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://3dnx8qpki60c"
 path.s3tc="res://.godot/imported/wave3_arcade_race_car_texture_20250901.png-e432b6d95155c9293c8cf9df2ed86a12.s3tc.ctex"
+path.etc2="res://.godot/imported/wave3_arcade_race_car_texture_20250901.png-e432b6d95155c9293c8cf9df2ed86a12.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/generated/cars/wave3_arcade_race_car_texture_20250901.png"
-dest_files=["res://.godot/imported/wave3_arcade_race_car_texture_20250901.png-e432b6d95155c9293c8cf9df2ed86a12.s3tc.ctex"]
+dest_files=["res://.godot/imported/wave3_arcade_race_car_texture_20250901.png-e432b6d95155c9293c8cf9df2ed86a12.s3tc.ctex", "res://.godot/imported/wave3_arcade_race_car_texture_20250901.png-e432b6d95155c9293c8cf9df2ed86a12.etc2.ctex"]
 
 [params]
 
