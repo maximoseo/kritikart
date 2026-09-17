@@ -1,0 +1,285 @@
+[gd_scene format=3 uid="uid://bp08jx344quxm"]
+
+[ext_resource type="Script" uid="uid://bwu1o385ttsbc" path="res://scripts/race/showcase_race_scene.gd" id="1_a4f8a"]
+[ext_resource type="Script" uid="uid://c360hanijsxb0" path="res://scripts/track/track_generator.gd" id="2_1cygd"]
+[ext_resource type="PackedScene" uid="uid://hdyeiyxpt8ir" path="res://scenes/player_car.tscn" id="3_ho65n"]
+[ext_resource type="Resource" uid="uid://efwsjf6wjdh8" path="res://resources/tracks/showcase_circuit.tres" id="3_j05bb"]
+[ext_resource type="Script" uid="uid://b7ftvxk4rgrbn" path="res://scripts/vehicles/npc_driver.gd" id="5_j05bb"]
+[ext_resource type="Script" uid="uid://d4ec4dtsyad7u" path="res://scripts/camera/camera_rig.gd" id="6_5juuk"]
+[ext_resource type="Script" uid="uid://camrubrc8108k" path="res://scripts/race/race_manager.gd" id="7_ym5jb"]
+[ext_resource type="Script" uid="uid://ifa13ytuiofq" path="res://scripts/ui/race_hud.gd" id="8_m4m2u"]
+[ext_resource type="Script" uid="uid://bdy2leo4bnxur" path="res://scripts/audio/race_audio_controller.gd" id="9_audio"]
+[ext_resource type="Script" uid="uid://uk7esavwrjs8" path="res://scripts/ui/race_flow_overlay.gd" id="10_overlay"]
+[ext_resource type="Script" uid="uid://87q2ak68240e" path="res://scripts/environment/premium_track_dressing.gd" id="11_premium"]
+[ext_resource type="PackedScene" uid="uid://jbhpsjba2hgg" path="res://assets/environment/generated_grandstand_hunyuan.glb" id="12_grandstand"]
+[ext_resource type="Resource" path="res://resources/profiles/camera/chase_camera_view.tres" id="13_chase_camera"]
+[ext_resource type="Resource" path="res://resources/profiles/camera/cockpit_placeholder_camera_view.tres" id="14_cockpit_camera"]
+[ext_resource type="Resource" path="res://resources/profiles/camera/look_back_camera_view.tres" id="15_look_back_camera"]
+[ext_resource type="PackedScene" uid="uid://d2nm4owyajfhx" path="res://scenes/tracks/manual_track_authoring.tscn" id="16_manual_track"]
+[ext_resource type="Texture2D" path="res://assets/environment/sky/evening_road_01_puresky_polyhaven.jpg" id="17_sky_panorama"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_collision"]
+size = Vector3(1.9, 1, 4.35)
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_showcase"]
+panorama = ExtResource("17_sky_panorama")
+energy_multiplier = 0.72
+
+[sub_resource type="Sky" id="Sky_showcase"]
+sky_material = SubResource("PanoramaSkyMaterial_showcase")
+
+[sub_resource type="Environment" id="Environment_55qj1"]
+background_mode = 2
+background_color = Color(0.98, 0.58, 0.32, 1)
+sky = SubResource("Sky_showcase")
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.66, 0.72, 1)
+ambient_light_energy = 0.44
+tonemap_mode = 3
+tonemap_exposure = 0.62
+tonemap_white = 7.5
+adjustment_enabled = true
+adjustment_brightness = 1.0
+adjustment_contrast = 1.03
+adjustment_saturation = 1.08
+ssr_enabled = true
+ssao_enabled = true
+ssao_radius = 2.0
+ssao_intensity = 0.52
+glow_enabled = true
+glow_intensity = 0.12
+glow_strength = 0.276
+glow_bloom = 0.048
+fog_enabled = true
+fog_light_color = Color(0.82, 0.72, 0.6, 1)
+fog_light_energy = 0.09
+fog_sun_scatter = 0.32
+fog_density = 0.00115
+fog_aerial_perspective = 0.58
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.0072
+volumetric_fog_albedo = Color(0.72, 0.7, 0.66, 1)
+volumetric_fog_emission = Color(0.78, 0.46, 0.24, 1)
+volumetric_fog_emission_energy = 0.012
+volumetric_fog_length = 220.0
+volumetric_fog_sky_affect = 0.276
+
+[node name="ShowcaseCircuitRace" type="Node3D" unique_id=1398284230]
+script = ExtResource("1_a4f8a")
+remove_npc_cars_on_ready = false
+
+[node name="World" type="Node3D" parent="." unique_id=143648707]
+
+[node name="ManualTrack" parent="World" unique_id=2040190543 instance=ExtResource("16_manual_track")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.16479492, 0.28395844, -0.21063232)
+
+[node name="TrackRoot" type="Node3D" parent="World" unique_id=1140943829]
+script = ExtResource("2_1cygd")
+track_profile = ExtResource("3_j05bb")
+source_path_node_path = NodePath("../ManualTrack/World/TrackSpline_4km")
+manual_spawn_marker_path = NodePath("../ManualTrack/World/SpawnMarkers/PlayerCarSpawn")
+generate_on_ready = false
+generate_road = false
+generate_markings = false
+generate_guardrails = false
+generate_scenery = false
+generate_collision = false
+generate_spawn_marker = false
+guardrail_seam_gap_m = 90.0
+metadata/track_profile = ExtResource("3_j05bb")
+metadata/track_query = Object(RefCounted,"script":Resource("res://scripts/track/track_query.gd"))
+
+metadata/track_length_m = 1800.0
+metadata/road_width_m = 22.0
+metadata/spawn_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="GeneratedTrack" type="Node3D" parent="World/TrackRoot" unique_id=1127117734]
+
+[node name="Terrain" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=267333090]
+
+[node name="Road" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=1512982037]
+
+[node name="Markings" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=71592993]
+
+[node name="Guardrails" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=2127561052]
+
+[node name="Collision" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=1816377718]
+
+[node name="Scenery" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=1776905175]
+
+[node name="Helpers" type="Node3D" parent="World/TrackRoot/GeneratedTrack" unique_id=84083809]
+
+[node name="SpawnMarkers" type="Node3D" parent="World/TrackRoot/GeneratedTrack/Helpers" unique_id=2044884497]
+
+[node name="PremiumVenueDressing" type="Node3D" parent="World" unique_id=855012144]
+script = ExtResource("11_premium")
+sponsor_texture_paths = PackedStringArray("res://assets/track/sponsors/sponsor_volt_racing.png", "res://assets/track/sponsors/sponsor_apex_energy.png", "res://assets/track/sponsors/sponsor_gripforge.png", "res://assets/track/sponsors/sponsor_neon_vector.png")
+building_count = 42
+skyline_distance_m = 186.0
+min_building_height_m = 32.0
+max_building_height_m = 132.0
+banner_count = 18
+floodlight_count = 12
+reflector_post_count = 16
+
+[node name="GeneratedGrandstandLeft" parent="World" unique_id=157446422 instance=ExtResource("12_grandstand")]
+transform = Transform3D(-0.8861375, 0, -23.983677, 0, 23.999998, 0, 23.983677, 0, -0.8861375, -204.29395, 1, 232.7642)
+
+[node name="GeneratedGrandstandRight" parent="World" unique_id=883709928 instance=ExtResource("12_grandstand")]
+transform = Transform3D(22.5526, 0, 8.20848, 0, 24, 0, -8.20848, 0, 22.5526, 82, 1, 62)
+
+[node name="Vehicles" type="Node3D" parent="World" unique_id=517205929]
+
+[node name="PlayerCar" parent="World/Vehicles" unique_id=211797938 instance=ExtResource("3_ho65n")]
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="World/Vehicles/PlayerCar" unique_id=953982835]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+shape = SubResource("BoxShape3D_collision")
+
+[node name="VisualRoot2" type="Node3D" parent="World/Vehicles/PlayerCar" unique_id=1010202558]
+
+[node name="CameraTarget2" type="Marker3D" parent="World/Vehicles/PlayerCar" unique_id=1583333663]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+
+[node name="NpcCars" type="Node3D" parent="World/Vehicles" unique_id=1659603456]
+
+[node name="TechnicianCar" parent="World/Vehicles/NpcCars" unique_id=385612983 instance=ExtResource("3_ho65n")]
+car_color_variant = "green"
+driver_path = NodePath("NpcDriver")
+use_default_player_driver = false
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="World/Vehicles/NpcCars/TechnicianCar" unique_id=276160872]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+shape = SubResource("BoxShape3D_collision")
+
+[node name="VisualRoot2" type="Node3D" parent="World/Vehicles/NpcCars/TechnicianCar" unique_id=1408622248]
+
+[node name="CameraTarget2" type="Marker3D" parent="World/Vehicles/NpcCars/TechnicianCar" unique_id=185086413]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+
+[node name="NpcDriver" type="Node" parent="World/Vehicles/NpcCars/TechnicianCar" unique_id=1940375992]
+script = ExtResource("5_j05bb")
+track_query_path = NodePath("../../../../TrackRoot")
+lane_index = 1
+
+[node name="BullyCar" parent="World/Vehicles/NpcCars" unique_id=1050300205 instance=ExtResource("3_ho65n")]
+car_color_variant = "red"
+driver_path = NodePath("NpcDriver")
+use_default_player_driver = false
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="World/Vehicles/NpcCars/BullyCar" unique_id=1896327699]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+shape = SubResource("BoxShape3D_collision")
+
+[node name="VisualRoot2" type="Node3D" parent="World/Vehicles/NpcCars/BullyCar" unique_id=1191023709]
+
+[node name="CameraTarget2" type="Marker3D" parent="World/Vehicles/NpcCars/BullyCar" unique_id=1078949972]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+
+[node name="NpcDriver" type="Node" parent="World/Vehicles/NpcCars/BullyCar" unique_id=1210286555]
+script = ExtResource("5_j05bb")
+track_query_path = NodePath("../../../../TrackRoot")
+personality_id = &"technician"
+
+[node name="ShowoffCar" parent="World/Vehicles/NpcCars" unique_id=2137897400 instance=ExtResource("3_ho65n")]
+car_color_variant = "yellow"
+driver_path = NodePath("NpcDriver")
+use_default_player_driver = false
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="World/Vehicles/NpcCars/ShowoffCar" unique_id=727789247]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+shape = SubResource("BoxShape3D_collision")
+
+[node name="VisualRoot2" type="Node3D" parent="World/Vehicles/NpcCars/ShowoffCar" unique_id=995370016]
+
+[node name="CameraTarget2" type="Marker3D" parent="World/Vehicles/NpcCars/ShowoffCar" unique_id=978576999]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+
+[node name="NpcDriver" type="Node" parent="World/Vehicles/NpcCars/ShowoffCar" unique_id=752290076]
+script = ExtResource("5_j05bb")
+track_query_path = NodePath("../../../../TrackRoot")
+personality_id = &"technician"
+lane_index = 1
+
+[node name="CameraRig" type="Node3D" parent="World" unique_id=1452391880]
+script = ExtResource("6_5juuk")
+target_path = NodePath("../Vehicles/PlayerCar")
+target_marker_name = &"CameraTarget2"
+camera_path = NodePath("ChaseCamera")
+track_query_provider_path = NodePath("../TrackRoot")
+chase_profile = ExtResource("13_chase_camera")
+cockpit_profile = ExtResource("14_cockpit_camera")
+look_back_profile = ExtResource("15_look_back_camera")
+
+[node name="ChaseCamera" type="Camera3D" parent="World/CameraRig" unique_id=2075822441]
+current = true
+fov = 67.0
+
+[node name="AudioListener3D" type="AudioListener3D" parent="World/CameraRig/ChaseCamera" unique_id=63301414]
+current = true
+
+[node name="Lighting" type="Node3D" parent="World" unique_id=1388093698]
+
+[node name="Sun" type="DirectionalLight3D" parent="World/Lighting" unique_id=381049704]
+transform = Transform3D(0.8480481, -0.3938068, 0.35458517, 0, 0.66913056, 0.74314487, -0.52991927, -0.63022256, 0.5674549, 0, 0, 0)
+light_color = Color(1, 0.84, 0.58, 1)
+light_energy = 1.18
+light_indirect_energy = 0.28
+light_volumetric_fog_energy = 0.68
+light_angular_distance = 1.08
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="World/Lighting" unique_id=939563467]
+environment = SubResource("Environment_55qj1")
+
+[node name="SkyFillLight" type="DirectionalLight3D" parent="World/Lighting"]
+transform = Transform3D(0.57357645, 0.33317915, -0.7483326, 0, 0.9135454, 0.40673664, 0.81915206, -0.23329456, 0.5239881, 0, 0, 0)
+light_color = Color(0.45, 0.56, 0.82, 1)
+light_energy = 0.34
+light_specular = 0.02
+shadow_enabled = false
+
+[node name="Managers" type="Node" parent="." unique_id=603629456]
+
+[node name="RaceManager" type="Node" parent="Managers" unique_id=1755325413]
+script = ExtResource("7_ym5jb")
+
+[node name="RaceAudio" type="Node" parent="Managers" unique_id=128787879]
+script = ExtResource("9_audio")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1129320086]
+script = ExtResource("8_m4m2u")
+race_manager_path = NodePath("../Managers/RaceManager")
+player_car_path = NodePath("../World/Vehicles/PlayerCar")
+
+[node name="Margin" type="MarginContainer" parent="UI" unique_id=427387364]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 440.0
+offset_bottom = 170.0
+
+[node name="Panel" type="Panel" parent="UI/Margin" unique_id=1523872052]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="UI/Margin/Panel" unique_id=1570464824]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="Readout" type="Label" parent="UI/Margin/Panel/Margin" unique_id=755598533]
+layout_mode = 2
+text = "Speed 000 km/h
+Mode GRIP
+Race SETUP
+Lap 1/3
+Pos --/--
+Time 00:00.000"
+vertical_alignment = 1
+
+[node name="RaceFlowOverlay" type="CanvasLayer" parent="." unique_id=1472234482]
+layer = 20
+script = ExtResource("10_overlay")

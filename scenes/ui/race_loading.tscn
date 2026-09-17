@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://3eivrh0jwlvc"]
+
+[ext_resource type="Script" uid="uid://dq0eugdhlyyv2" path="res://scripts/ui/race_loading.gd" id="1_race_loading"]
+
+[node name="RaceLoading" type="Control" unique_id=405071852]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_race_loading")

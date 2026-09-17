@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="LightingProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/profiles/lighting_profile.gd" id="1_lighting"]
+
+[resource]
+resource_name = "StormCoastLighting"
+script = ExtResource("1_lighting")
+lighting_id = &"storm_coast_golden_hour_wet"
+display_name = "Storm Coast Golden Hour Wet"
+time_of_day = "storm_dusk"
+weather_preset_id = &"golden_hour_wet_road"
+sky_color = Color(0.08, 0.18, 0.36, 1)
+horizon_color = Color(1.0, 0.58, 0.30, 1)
+ambient_light_color = Color(0.78, 0.68, 0.58, 1)
+ambient_energy = 0.58
+sun_color = Color(1.0, 0.66, 0.36, 1)
+sun_energy = 2.35
+sun_rotation_degrees = Vector3(-24, -48, 0)
+shadow_softness = 0.95
+fog_enabled = true
+fog_color = Color(0.72, 0.50, 0.40, 1)
+fog_density = 0.00145
+rain_intensity = 0.18
+wetness_multiplier = 0.86
+reflection_probe_budget = {
+"garage": 1,
+"track_key_zones": 3,
+"set_piece": 1
+}
+notes = "Golden-hour wet-road profile for Storm Coast hero slice. The live preview scene mirrors these values until a runtime lighting applier is added."

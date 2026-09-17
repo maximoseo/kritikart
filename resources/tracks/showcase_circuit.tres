@@ -1,0 +1,97 @@
+[gd_resource type="Resource" script_class="TrackProfile" format=3 uid="uid://efwsjf6wjdh8"]
+
+[ext_resource type="Script" uid="uid://ctuore486bkmt" path="res://scripts/track/track_profile.gd" id="1_profile"]
+[ext_resource type="Script" uid="uid://4p2yi355rk3s" path="res://scripts/track/track_guardrail_settings.gd" id="2_guardrails"]
+[ext_resource type="Script" uid="uid://djamug8sfr3fm" path="res://scripts/track/track_environment_section.gd" id="3_section"]
+[ext_resource type="Script" uid="uid://rdg3xk4pvo43" path="res://scripts/track/transition_profile.gd" id="4_transition"]
+[ext_resource type="Resource" uid="uid://cjxfnw5v0y4ju" path="res://resources/tracks/environments/highway_crops_environment.tres" id="5_highway"]
+[ext_resource type="Resource" uid="uid://djs8ejpjtvdfq" path="res://resources/tracks/environments/industrial_environment.tres" id="6_industrial"]
+
+[sub_resource type="Resource" id="Section_highway_open"]
+script = ExtResource("3_section")
+environment = ExtResource("5_highway")
+end_distance_ratio = 0.45
+notes = "Primary Highway/Crops section."
+
+[sub_resource type="Resource" id="Section_industrial"]
+script = ExtResource("3_section")
+environment = ExtResource("6_industrial")
+start_distance_ratio = 0.57
+end_distance_ratio = 0.88
+notes = "Primary Industrial section."
+
+[sub_resource type="Resource" id="Guardrails_showcase"]
+script = ExtResource("2_guardrails")
+thickness_m = 1.35
+height_m = 2.2
+post_spacing_m = 18.0
+post_size_m = 0.5
+
+[sub_resource type="Resource" id="Transition_highway_to_industrial"]
+script = ExtResource("4_transition")
+from_environment = ExtResource("5_highway")
+to_environment = ExtResource("6_industrial")
+start_distance_ratio = 0.45
+end_distance_ratio = 0.57
+prop_crossfade_rules = {
+"billboards": "Highway ads shift toward industrial signage.",
+"crops": "Crop clusters become less frequent.",
+"farmhouses": "Farmhouse/fenced areas taper out.",
+"utility_props": "Utility props appear."
+}
+audio_crossfade_rules = {
+"from": "open_road_countryside",
+"to": "industrial_hum"
+}
+terrain_crossfade_rules = {
+"from": "grass/crop/soil",
+"to": "gravel/asphalt/concrete"
+}
+notes = "Mechanically stable road; only environment weights and prop density change."
+
+[sub_resource type="Resource" id="Transition_industrial_to_highway"]
+script = ExtResource("4_transition")
+from_environment = ExtResource("6_industrial")
+to_environment = ExtResource("5_highway")
+start_distance_ratio = 0.88
+prop_crossfade_rules = {
+"billboards": "Highway-style billboards return.",
+"containers": "Containers taper out.",
+"factories": "Industrial buildings taper out.",
+"sightlines": "Open sightlines increase before the lap boundary."
+}
+audio_crossfade_rules = {
+"from": "industrial_hum",
+"to": "open_road_countryside"
+}
+terrain_crossfade_rules = {
+"from": "gravel/concrete",
+"to": "grass/crops"
+}
+notes = "Closed-loop transition back to Highway/Crops."
+
+[resource]
+resource_name = "ShowcaseCircuit"
+script = ExtResource("1_profile")
+track_id = &"showcase_circuit"
+display_name = "Showcase Circuit"
+target_length_m = 4000.0
+road_width_m = 8.0
+guardrail_settings = SubResource("Guardrails_showcase")
+environment_sections = Array[Resource]([SubResource("Section_highway_open"), SubResource("Section_industrial")])
+transitions = Array[Resource]([SubResource("Transition_highway_to_industrial"), SubResource("Transition_industrial_to_highway")])
+music_key = &"showcase_race_loop"
+lap_count = 1
+spawn_lane_spacing_m = 4.6
+difficulty_defaults = {
+"easy": {
+"assist": 1.0
+},
+"hard": {
+"assist": 0.35
+},
+"medium": {
+"assist": 0.7
+}
+}
+notes = "Manual 4km, 8m-wide test loop sourced from res://scenes/tracks/manual_track_authoring.tscn. Environment metadata remains for UI/audio weighting while the visible track is manually authored."

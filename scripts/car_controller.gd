@@ -1,0 +1,1033 @@
+class_name ArcadeCarController
+extends CharacterBody3D
+
+const VehicleCommandScript := preload("res://scripts/vehicles/vehicle_command.gd")
+const PlayerDriverScript := preload("res://scripts/vehicles/player_driver.gd")
+const KMH_TO_MPS: float = 1.0 / 3.6
+
+signal drift_started(intensity: float)
+signal drift_ended
+signal drift_intensity_changed(intensity: float)
+signal wall_scraped(intensity: float, contact_position: Vector3, contact_normal: Vector3)
+signal vehicle_bumped(intensity: float, contact_position: Vector3, contact_normal: Vector3)
+
+@export_category("Speed")
+@export var max_speed: float = 92.0
+@export var reverse_speed: float = 18.0
+@export var acceleration: float = 42.0
+@export var reverse_acceleration: float = 24.0
+@export var brake_force: float = 70.0
+@export var rolling_drag: float = 18.0
+
+@export_category("Transmission")
+@export var automatic_transmission: bool = true
+@export_range(1, 8, 1) var gear_count: int = 6
+@export_range(1, 8, 1) var starting_gear: int = 1
+@export var gear_speed_limits_kmh: PackedFloat32Array = PackedFloat32Array([60.0, 110.0, 155.0, 195.0, 230.0, 260.0])
+@export_range(0.0, 0.5, 0.01) var gear_shift_cooldown_seconds: float = 0.12
+@export_range(0.0, 1.0, 0.01) var downshift_speed_blend: float = 0.08
+@export_range(0.5, 1.0, 0.01) var automatic_upshift_ratio: float = 0.94
+@export_range(0.1, 0.95, 0.01) var automatic_downshift_ratio: float = 0.72
+
+@export_category("Handling")
+@export var low_speed_turn_rate: float = 1.8
+@export var high_speed_turn_rate: float = 0.95
+@export var min_steer_speed: float = 2.0
+@export_range(0.0, 3.0, 0.05) var low_speed_stop_epsilon: float = 0.35
+@export var reverse_turn_multiplier: float = 0.72
+@export_range(0.5, 2.5, 0.05) var steering_response_exponent: float = 1.0
+@export var normal_lateral_grip: float = 58.0
+@export var ground_stick_force: float = 12.0
+@export var high_speed_ground_stick_force: float = 24.0
+@export_range(0.0, 3.0, 0.05) var ground_snap_length_m: float = 1.1
+@export_range(0.0, 85.0, 1.0) var floor_max_angle_degrees: float = 68.0
+@export var gravity: float = 42.0
+
+@export_category("Surface Alignment")
+@export_range(0.0, 1.0, 0.01) var ground_surface_alignment: float = 1.0
+@export_range(1.0, 30.0, 0.1) var ground_surface_alignment_damping: float = 12.0
+@export_range(1.0, 30.0, 0.1) var air_surface_recovery_damping: float = 4.0
+
+@export_category("Rear-Wheel Drive")
+@export var rear_drive_turn_assist: float = 0.28
+@export var rear_drive_power_oversteer: float = 4.0
+
+@export_category("Drift")
+@export var drift_min_speed: float = 12.0
+@export var drift_lateral_grip: float = 14.0
+@export var drift_side_slip: float = 11.0
+@export var drift_turn_multiplier: float = 1.45
+@export var drift_steering_gain: float = 0.75
+@export var drift_drag: float = 10.0
+@export_range(0.25, 1.0, 0.01) var drift_speed_cap_ratio: float = 1.0
+
+@export_category("Collision Feel")
+@export_range(0.0, 1.0, 0.01) var wall_glance_speed_retention: float = 0.74
+@export_range(0.0, 1.0, 0.01) var wall_head_on_speed_retention: float = 0.34
+@export_range(0.0, 1.0, 0.01) var vehicle_bump_speed_retention: float = 0.58
+@export_range(0.0, 1.0, 0.01) var collision_slide_push: float = 0.18
+@export_range(0.0, 20.0, 0.1) var collision_min_response_speed: float = 4.5
+@export_range(0.0, 1.0, 0.01) var wall_contact_max_up_dot: float = 0.48
+
+@export_category("Visual Feel")
+@export var body_roll_degrees: float = 4.5
+@export var drift_roll_degrees: float = 6.0
+@export var pitch_degrees: float = 0.35
+@export_range(0.0, 1.0, 0.01) var pitch_fade_start_speed_ratio: float = 0.35
+@export_range(0.0, 1.0, 0.01) var pitch_fade_end_speed_ratio: float = 0.85
+@export_range(0.0, 1.0, 0.01) var high_speed_pitch_multiplier: float = 0.08
+@export_range(0.0, 1.0, 0.01) var high_speed_roll_multiplier: float = 0.5
+@export_range(1.0, 30.0, 0.1) var visual_input_damping: float = 12.0
+@export_range(1.0, 30.0, 0.1) var visual_roll_damping: float = 10.0
+@export_range(1.0, 30.0, 0.1) var visual_pitch_damping: float = 10.0
+@export var wheel_spin_multiplier: float = 2.8
+@export var front_wheel_steer_degrees: float = 28.0
+@export_enum("blue", "red", "green", "yellow") var car_color_variant: String = "blue"
+
+@export_category("Imported Model Material")
+@export var apply_imported_model_material_override: bool = true
+@export_file("*.png", "*.jpg", "*.jpeg", "*.webp") var imported_model_albedo_texture_path: String = "res://assets/cars/player_hypercar_red_metallic_studio_texture.png"
+@export_file("*.png", "*.jpg", "*.jpeg", "*.webp") var imported_model_normal_texture_path: String = "res://assets/cars/player_hypercar_normal.png"
+@export var imported_model_albedo_tint: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export_range(0.0, 1.0, 0.01) var imported_model_metallic: float = 0.72
+@export_range(0.02, 1.0, 0.01) var imported_model_roughness: float = 0.22
+
+@export_category("Command Source")
+@export var driver_path: NodePath = NodePath("")
+@export var use_default_player_driver: bool = true
+@export var controls_enabled: bool = true
+
+@onready var visual_root: Node3D = get_node_or_null("VisualRoot")
+@onready var wheel_nodes: Array[Node3D] = [
+	_find_first_node3d([
+		"VisualRoot/SteeringPivotFL/WheelFL",
+		"VisualRoot/WheelPivotFL/WheelFL",
+		"VisualRoot/WheelFLPivot/WheelFL",
+		"VisualRoot/FrontLeftSteeringPivot/WheelFL",
+		"VisualRoot/FrontLeftWheelPivot/WheelFL",
+		"VisualRoot/WheelFL/WheelMesh",
+		"VisualRoot/WheelFL",
+	]),
+	_find_first_node3d([
+		"VisualRoot/SteeringPivotFR/WheelFR",
+		"VisualRoot/WheelPivotFR/WheelFR",
+		"VisualRoot/WheelFRPivot/WheelFR",
+		"VisualRoot/FrontRightSteeringPivot/WheelFR",
+		"VisualRoot/FrontRightWheelPivot/WheelFR",
+		"VisualRoot/WheelFR/WheelMesh",
+		"VisualRoot/WheelFR",
+	]),
+	_find_first_node3d([
+		"VisualRoot/WheelRL/WheelMesh",
+		"VisualRoot/WheelRL",
+		"VisualRoot/RearLeftWheel",
+	]),
+	_find_first_node3d([
+		"VisualRoot/WheelRR/WheelMesh",
+		"VisualRoot/WheelRR",
+		"VisualRoot/RearRightWheel",
+	]),
+]
+@onready var front_wheel_steering_nodes: Array[Node3D] = [
+	_find_first_node3d([
+		"VisualRoot/SteeringPivotFL",
+		"VisualRoot/WheelPivotFL",
+		"VisualRoot/WheelFLPivot",
+		"VisualRoot/FrontLeftSteeringPivot",
+		"VisualRoot/FrontLeftWheelPivot",
+		"VisualRoot/WheelFL",
+	]),
+	_find_first_node3d([
+		"VisualRoot/SteeringPivotFR",
+		"VisualRoot/WheelPivotFR",
+		"VisualRoot/FrontRightSteeringPivot",
+		"VisualRoot/FrontRightWheelPivot",
+		"VisualRoot/WheelFR",
+	]),
+]
+
+var steering_input: float = 0.0
+var steer_amount: float = 0.0
+var effective_steer_amount: float = 0.0
+var throttle_amount: float = 0.0
+var brake_amount: float = 0.0
+var is_drifting: bool = false
+var drift_intensity: float = 0.0
+var vehicle_command: RefCounted = VehicleCommandScript.new()
+
+var _driver_node: Node = null
+var _drift_input_active: bool = false
+var _forward_speed: float = 0.0
+var _side_speed: float = 0.0
+var _wheel_spin: float = 0.0
+var _front_wheel_rest_y: Array[float] = []
+var _fallback_player_driver: Node = null
+var _current_gear: int = 1
+var _shift_cooldown: float = 0.0
+var _was_drifting: bool = false
+var _last_reported_drift_intensity: float = 0.0
+var _wall_scrape_cooldown: float = 0.0
+var _vehicle_bump_cooldown: float = 0.0
+var _visual_steer_amount: float = 0.0
+var _visual_throttle_amount: float = 0.0
+var _visual_brake_amount: float = 0.0
+var _visual_drift_intensity: float = 0.0
+var _surface_up: Vector3 = Vector3.UP
+
+
+func _ready() -> void:
+	_sync_character_body_grounding_settings()
+	_current_gear = clampi(starting_gear, 1, maxi(gear_count, 1))
+	_resolve_driver()
+	_apply_car_color_variant()
+	_apply_imported_model_material_override()
+	_front_wheel_rest_y.clear()
+	for steering_node: Node3D in front_wheel_steering_nodes:
+		var rest_y: float = 0.0
+		if steering_node != null:
+			rest_y = steering_node.rotation.y
+		_front_wheel_rest_y.append(rest_y)
+
+
+func _exit_tree() -> void:
+	if _fallback_player_driver != null:
+		_fallback_player_driver.free()
+		_fallback_player_driver = null
+
+
+func _physics_process(delta: float) -> void:
+	if not _is_finite_float(delta) or delta <= 0.0:
+		return
+	_sync_character_body_grounding_settings()
+	_sanitize_physics_state()
+	_update_surface_alignment(delta)
+	var previous_planar_velocity: Vector3 = _drive_plane_velocity()
+	_wall_scrape_cooldown = maxf(0.0, _wall_scrape_cooldown - delta)
+	_vehicle_bump_cooldown = maxf(0.0, _vehicle_bump_cooldown - delta)
+	_shift_cooldown = maxf(0.0, _shift_cooldown - delta)
+	_read_command(delta)
+	_update_planar_velocity(delta)
+	_update_automatic_transmission()
+	_update_visuals(delta)
+	move_and_slide()
+	_apply_collision_recovery(previous_planar_velocity)
+	_emit_drift_feedback()
+	_emit_collision_feedback(previous_planar_velocity)
+
+
+func get_speed() -> float:
+	var drive_plane_velocity := _drive_plane_velocity()
+	if not drive_plane_velocity.is_finite():
+		return 0.0
+	return drive_plane_velocity.length()
+
+
+func get_speed_ratio() -> float:
+	if not _is_finite_float(max_speed) or max_speed <= 0.0:
+		return 0.0
+	return clampf(get_speed() / max_speed, 0.0, 1.0)
+
+
+func get_forward_speed() -> float:
+	return _forward_speed if _is_finite_float(_forward_speed) else 0.0
+
+
+func get_current_gear() -> int:
+	return clampi(_current_gear, 1, maxi(gear_count, 1))
+
+
+func set_automatic_transmission_enabled(enabled: bool) -> void:
+	automatic_transmission = enabled
+	_shift_cooldown = 0.0
+
+
+func is_automatic_transmission_enabled() -> bool:
+	return automatic_transmission
+
+
+func set_manual_transmission_enabled(enabled: bool) -> void:
+	set_automatic_transmission_enabled(not enabled)
+
+
+func is_manual_transmission_enabled() -> bool:
+	return not automatic_transmission
+
+
+func get_gear_count() -> int:
+	return maxi(gear_count, 1)
+
+
+func get_current_gear_ratio() -> float:
+	var gear: int = get_current_gear()
+	var lower_limit: float = 0.0 if gear <= 1 else _gear_speed_limit(gear - 1)
+	var upper_limit: float = maxf(_gear_speed_limit(gear), lower_limit + 1.0)
+	var speed: float = maxf(get_forward_speed(), 0.0)
+	return clampf((speed - lower_limit) / maxf(upper_limit - lower_limit, 1.0), 0.0, 1.0)
+
+
+func get_current_gear_speed_limit_kmh() -> float:
+	return _gear_speed_limit(get_current_gear()) * 3.6
+
+
+func get_effective_steering() -> float:
+	return effective_steer_amount if _is_finite_float(effective_steer_amount) else 0.0
+
+
+func get_effective_steer_amount() -> float:
+	return effective_steer_amount if _is_finite_float(effective_steer_amount) else 0.0
+
+
+func get_throttle_amount() -> float:
+	return throttle_amount if _is_finite_float(throttle_amount) else 0.0
+
+
+func get_brake_amount() -> float:
+	return brake_amount if _is_finite_float(brake_amount) else 0.0
+
+
+func get_steering_input() -> float:
+	return steering_input if _is_finite_float(steering_input) else 0.0
+
+
+func get_drift_intensity() -> float:
+	return drift_intensity if _is_finite_float(drift_intensity) else 0.0
+
+
+func are_controls_enabled() -> bool:
+	return controls_enabled
+
+
+func get_last_input_device() -> StringName:
+	var driver: Node = _active_driver_node()
+	if driver != null and driver.has_method("get_last_input_device"):
+		return StringName(driver.call("get_last_input_device"))
+	return &"none"
+
+
+func get_last_controller_device() -> int:
+	var driver: Node = _active_driver_node()
+	if driver != null and driver.has_method("get_last_controller_device"):
+		return int(driver.call("get_last_controller_device"))
+	return -1
+
+
+func set_vehicle_command(next_command: RefCounted) -> void:
+	vehicle_command.copy_from(next_command)
+	_sync_command_state()
+
+
+func get_vehicle_command() -> RefCounted:
+	return vehicle_command.duplicate_command()
+
+
+func set_controls_enabled(enabled: bool) -> void:
+	controls_enabled = enabled
+	if not controls_enabled:
+		vehicle_command.clear()
+		_clear_driver_input_state()
+		_sync_command_state()
+
+
+func set_car_color_variant(variant_id: String) -> void:
+	car_color_variant = variant_id
+	_apply_car_color_variant()
+
+
+func _resolve_driver() -> void:
+	_driver_node = null
+	if not String(driver_path).is_empty():
+		_driver_node = get_node_or_null(driver_path)
+
+
+func _active_driver_node() -> Node:
+	if _driver_node != null and is_instance_valid(_driver_node):
+		return _driver_node
+	if _fallback_player_driver != null and is_instance_valid(_fallback_player_driver):
+		return _fallback_player_driver
+	if not String(driver_path).is_empty():
+		_resolve_driver()
+		if _driver_node != null:
+			return _driver_node
+	return null
+
+
+func _read_command(delta: float) -> void:
+	if not controls_enabled:
+		vehicle_command.clear()
+		_clear_driver_input_state()
+		_sync_command_state()
+		return
+
+	var command_written: bool = false
+	if _driver_node == null and not String(driver_path).is_empty():
+		_resolve_driver()
+
+	if _driver_node != null:
+		if _driver_node.has_method("write_command_with_delta"):
+			_driver_node.call("write_command_with_delta", vehicle_command, delta)
+			command_written = true
+		elif _driver_node.has_method("write_command"):
+			_driver_node.call("write_command", vehicle_command)
+			command_written = true
+		elif _driver_node.has_method("get_command"):
+			var next_command: Variant = _driver_node.call("get_command")
+			if next_command is RefCounted and next_command.has_method("copy_from"):
+				vehicle_command.copy_from(next_command as RefCounted)
+				command_written = true
+
+	if not command_written:
+		if use_default_player_driver:
+			if _fallback_player_driver == null:
+				_fallback_player_driver = PlayerDriverScript.new()
+			if _fallback_player_driver.has_method("write_command_with_delta"):
+				_fallback_player_driver.call("write_command_with_delta", vehicle_command, delta)
+			else:
+				_fallback_player_driver.write_command(vehicle_command)
+		else:
+			vehicle_command.clear()
+
+	_sync_command_state()
+
+
+func _sync_command_state() -> void:
+	throttle_amount = clampf(_finite_or(vehicle_command.throttle, 0.0), 0.0, 1.0)
+	brake_amount = clampf(_finite_or(vehicle_command.brake, 0.0), 0.0, 1.0)
+	steering_input = clampf(_finite_or(vehicle_command.steer, 0.0), -1.0, 1.0)
+	_drift_input_active = vehicle_command.drift
+	_apply_gear_delta(int(vehicle_command.get(&"gear_delta")))
+
+
+func _update_planar_velocity(delta: float) -> void:
+	var forward: Vector3 = _flat_forward()
+	var right: Vector3 = _flat_right()
+	var vertical_velocity: Vector3 = velocity - forward * velocity.dot(forward) - right * velocity.dot(right)
+	if not vertical_velocity.is_finite():
+		vertical_velocity = Vector3.ZERO
+
+	_forward_speed = velocity.dot(forward)
+	_side_speed = velocity.dot(right)
+	_forward_speed = _finite_or(_forward_speed, 0.0)
+	_side_speed = _finite_or(_side_speed, 0.0)
+
+	var safe_max_speed: float = maxf(_finite_or(max_speed, 1.0), 1.0)
+	var current_gear_speed_limit: float = minf(maxf(_gear_speed_limit(get_current_gear()), 1.0), safe_max_speed)
+	var speed_ratio: float = clampf(absf(_forward_speed) / safe_max_speed, 0.0, 1.0)
+	var forward_speed_ratio: float = clampf(_forward_speed / safe_max_speed, 0.0, 1.0)
+	var steer_speed_weight: float = _low_speed_steer_weight(_forward_speed)
+	var shaped_steering: float = _shape_axis(steering_input, steering_response_exponent)
+	effective_steer_amount = shaped_steering * steer_speed_weight
+	steer_amount = effective_steer_amount
+
+	is_drifting = _drift_input_active and _forward_speed >= drift_min_speed
+	if is_drifting:
+		var drift_speed_range: float = maxf(max_speed - drift_min_speed, 1.0)
+		var drift_speed_ratio: float = clampf((_forward_speed - drift_min_speed) / drift_speed_range, 0.0, 1.0)
+		var steering_bonus: float = clampf(0.45 + absf(effective_steer_amount) * drift_steering_gain, 0.0, 1.0)
+		drift_intensity = drift_speed_ratio * steering_bonus
+	else:
+		drift_intensity = 0.0
+
+	var turn_rate: float = lerpf(low_speed_turn_rate, high_speed_turn_rate, speed_ratio)
+	if is_drifting:
+		turn_rate *= drift_turn_multiplier * (1.0 + absf(effective_steer_amount) * drift_steering_gain)
+	else:
+		turn_rate *= 1.0 + throttle_amount * rear_drive_turn_assist * forward_speed_ratio
+
+	var driving_direction: float = signf(_forward_speed)
+	if steer_speed_weight <= 0.0:
+		driving_direction = 0.0
+	var reverse_steer_scale: float = reverse_turn_multiplier if driving_direction < 0.0 else 1.0
+	rotate_y(-effective_steer_amount * turn_rate * driving_direction * reverse_steer_scale * delta)
+
+	forward = _flat_forward()
+	right = _flat_right()
+
+	if throttle_amount > 0.0:
+		_forward_speed = move_toward(_forward_speed, current_gear_speed_limit, acceleration * throttle_amount * delta)
+	elif brake_amount > 0.0:
+		if _forward_speed > 2.0:
+			_forward_speed = move_toward(_forward_speed, 0.0, brake_force * brake_amount * delta)
+		else:
+			_forward_speed = move_toward(_forward_speed, -reverse_speed, reverse_acceleration * brake_amount * delta)
+	else:
+		_forward_speed = move_toward(_forward_speed, 0.0, rolling_drag * delta)
+
+	var target_side_speed: float = 0.0
+	var grip: float = normal_lateral_grip
+	if is_drifting:
+		grip = drift_lateral_grip
+		target_side_speed = -effective_steer_amount * drift_side_slip * (0.35 + drift_intensity)
+	elif throttle_amount > 0.0:
+		target_side_speed = -effective_steer_amount * rear_drive_power_oversteer * throttle_amount * speed_ratio
+	_side_speed = move_toward(_side_speed, target_side_speed, grip * delta)
+	_settle_low_speed_residuals()
+	if is_drifting:
+		_apply_planar_speed_bleed(maxf(_finite_or(drift_drag, 0.0), 0.0) * maxf(0.35, drift_intensity) * delta)
+	# Cap after side slip so lateral drift cannot create extra planar energy.
+	_apply_planar_speed_cap(_planar_speed_cap(current_gear_speed_limit))
+
+	if is_on_floor():
+		var speed_stick_alpha: float = smoothstep(
+				0.18,
+				0.92,
+				clampf(absf(_forward_speed) / safe_max_speed, 0.0, 1.0)
+		)
+		vertical_velocity = -_driving_up() * lerpf(
+				maxf(_finite_or(ground_stick_force, 0.0), 0.0),
+				maxf(_finite_or(high_speed_ground_stick_force, ground_stick_force), 0.0),
+				speed_stick_alpha
+		)
+	else:
+		vertical_velocity += Vector3.DOWN * gravity * delta
+
+	velocity = forward * _forward_speed + right * _side_speed + vertical_velocity
+	if not velocity.is_finite():
+		velocity = Vector3.ZERO
+
+
+func _update_automatic_transmission() -> void:
+	_current_gear = get_current_gear()
+	if not automatic_transmission or _shift_cooldown > 0.0:
+		return
+
+	var current_gear: int = get_current_gear()
+	var safe_gear_count: int = get_gear_count()
+	var forward_speed: float = maxf(_finite_or(_forward_speed, 0.0), 0.0)
+	if current_gear < safe_gear_count:
+		var upshift_at: float = _gear_speed_limit(current_gear) * clampf(automatic_upshift_ratio, 0.5, 1.0)
+		if forward_speed >= upshift_at:
+			_shift_to_gear(current_gear + 1)
+			return
+
+	if current_gear > 1:
+		var previous_gear_limit: float = _gear_speed_limit(current_gear - 1)
+		var downshift_at: float = previous_gear_limit * clampf(automatic_downshift_ratio, 0.1, 0.95)
+		if forward_speed <= downshift_at:
+			_shift_to_gear(current_gear - 1)
+
+
+func _apply_gear_delta(gear_delta: int) -> void:
+	if gear_delta == 0 or _shift_cooldown > 0.0:
+		return
+	var direction: int = 1 if gear_delta > 0 else -1
+	var next_gear: int = clampi(get_current_gear() + direction, 1, get_gear_count())
+	_shift_to_gear(next_gear)
+
+
+func _shift_to_gear(next_gear: int) -> void:
+	next_gear = clampi(next_gear, 1, get_gear_count())
+	if next_gear == _current_gear:
+		return
+
+	var shifted_down: bool = next_gear < _current_gear
+	_current_gear = next_gear
+	_shift_cooldown = gear_shift_cooldown_seconds
+	if shifted_down:
+		_soften_downshift_overspeed()
+
+
+func _soften_downshift_overspeed() -> void:
+	var forward: Vector3 = _flat_forward()
+	var right: Vector3 = _flat_right()
+	var forward_speed: float = velocity.dot(forward)
+	var gear_limit: float = _gear_speed_limit(get_current_gear())
+	if forward_speed <= gear_limit:
+		return
+
+	var side_speed: float = velocity.dot(right)
+	var vertical_velocity: Vector3 = velocity - forward * forward_speed - right * side_speed
+	if not vertical_velocity.is_finite():
+		vertical_velocity = Vector3.ZERO
+	var softened_speed: float = lerpf(forward_speed, gear_limit, clampf(downshift_speed_blend, 0.0, 1.0))
+	velocity = forward * softened_speed + right * side_speed + vertical_velocity
+	_forward_speed = softened_speed
+	_side_speed = side_speed
+
+
+func _gear_speed_limit(gear: int) -> float:
+	var safe_gear_count: int = maxi(gear_count, 1)
+	var clamped_gear: int = clampi(gear, 1, safe_gear_count)
+	if gear_speed_limits_kmh.size() >= clamped_gear:
+		var explicit_limit_kmh: float = float(gear_speed_limits_kmh[clamped_gear - 1])
+		if _is_finite_float(explicit_limit_kmh) and explicit_limit_kmh > 0.0:
+			return minf(explicit_limit_kmh * KMH_TO_MPS, maxf(max_speed, 1.0))
+	return maxf(max_speed, 1.0) * (float(clamped_gear) / float(safe_gear_count))
+
+
+func _planar_speed_cap(current_gear_speed_limit: float) -> float:
+	var safe_cap: float = maxf(minf(current_gear_speed_limit, maxf(_finite_or(max_speed, 1.0), 1.0)), 1.0)
+	if _forward_speed < 0.0:
+		safe_cap = maxf(_finite_or(reverse_speed, 1.0), 1.0)
+	if is_drifting:
+		safe_cap *= clampf(_finite_or(drift_speed_cap_ratio, 1.0), 0.25, 1.0)
+	return safe_cap
+
+
+func _apply_planar_speed_bleed(amount: float) -> void:
+	amount = maxf(_finite_or(amount, 0.0), 0.0)
+	if amount <= 0.0:
+		return
+
+	var planar_speed: float = Vector2(_forward_speed, _side_speed).length()
+	if not _is_finite_float(planar_speed) or planar_speed <= 0.0001:
+		_forward_speed = 0.0
+		_side_speed = 0.0
+		return
+
+	var next_speed: float = maxf(planar_speed - amount, 0.0)
+	var speed_scale: float = next_speed / planar_speed
+	_forward_speed *= speed_scale
+	_side_speed *= speed_scale
+
+
+func _apply_planar_speed_cap(speed_cap: float) -> void:
+	speed_cap = maxf(_finite_or(speed_cap, 1.0), 1.0)
+	var planar_speed: float = Vector2(_forward_speed, _side_speed).length()
+	if not _is_finite_float(planar_speed):
+		_forward_speed = 0.0
+		_side_speed = 0.0
+		return
+	if planar_speed <= speed_cap or planar_speed <= 0.0001:
+		return
+
+	var speed_scale: float = speed_cap / planar_speed
+	_forward_speed *= speed_scale
+	_side_speed *= speed_scale
+
+
+func _low_speed_steer_weight(forward_speed: float) -> float:
+	var stop_speed: float = maxf(_finite_or(low_speed_stop_epsilon, 0.0), 0.0)
+	var full_steer_speed: float = maxf(_finite_or(min_steer_speed, 0.0), stop_speed + 0.001)
+	var t: float = clampf((absf(_finite_or(forward_speed, 0.0)) - stop_speed) / (full_steer_speed - stop_speed), 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+
+func _settle_low_speed_residuals() -> void:
+	var stop_speed: float = maxf(_finite_or(low_speed_stop_epsilon, 0.0), 0.0)
+	var has_drive_input: bool = throttle_amount > 0.001 or brake_amount > 0.001
+	if not has_drive_input and absf(_forward_speed) <= stop_speed:
+		_forward_speed = 0.0
+	if not is_drifting and absf(_side_speed) <= stop_speed:
+		_side_speed = 0.0
+
+
+func _update_visuals(delta: float) -> void:
+	if visual_root != null:
+		var pitch_speed_ratio: float = clampf(absf(_forward_speed) / maxf(_finite_or(max_speed, 1.0), 1.0), 0.0, 1.0)
+		var visual_input_weight: float = _exp_weight(visual_input_damping, delta)
+		_visual_steer_amount = lerpf(_visual_steer_amount, effective_steer_amount, visual_input_weight)
+		_visual_throttle_amount = lerpf(_visual_throttle_amount, throttle_amount, visual_input_weight)
+		_visual_brake_amount = lerpf(_visual_brake_amount, brake_amount, visual_input_weight)
+		_visual_drift_intensity = lerpf(_visual_drift_intensity, drift_intensity, visual_input_weight)
+
+		var roll_speed_alpha: float = smoothstep(0.35, 0.92, pitch_speed_ratio)
+		var roll_speed_multiplier: float = lerpf(1.0, clampf(high_speed_roll_multiplier, 0.0, 1.0), roll_speed_alpha)
+		var roll_strength: float = lerpf(body_roll_degrees, drift_roll_degrees, _visual_drift_intensity) * roll_speed_multiplier
+		var target_roll: float = deg_to_rad(-_visual_steer_amount * roll_strength)
+		var pitch_fade_range: float = maxf(pitch_fade_end_speed_ratio - pitch_fade_start_speed_ratio, 0.001)
+		var pitch_fade_alpha: float = clampf((pitch_speed_ratio - pitch_fade_start_speed_ratio) / pitch_fade_range, 0.0, 1.0)
+		var pitch_multiplier: float = lerpf(1.0, clampf(high_speed_pitch_multiplier, 0.0, 1.0), pitch_fade_alpha)
+		var target_pitch: float = deg_to_rad((_visual_throttle_amount - _visual_brake_amount) * pitch_degrees * pitch_multiplier)
+		visual_root.rotation.z = lerp_angle(visual_root.rotation.z, target_roll, _exp_weight(visual_roll_damping, delta))
+		visual_root.rotation.x = lerp_angle(visual_root.rotation.x, target_pitch, _exp_weight(visual_pitch_damping, delta))
+
+	var target_front_wheel_yaw: float = deg_to_rad(_visual_steer_amount * front_wheel_steer_degrees)
+	var wheel_steer_weight: float = 1.0 - exp(-14.0 * delta)
+	for i: int in range(front_wheel_steering_nodes.size()):
+		var steering_node: Node3D = front_wheel_steering_nodes[i]
+		if steering_node != null:
+			var rest_y: float = 0.0
+			if i < _front_wheel_rest_y.size():
+				rest_y = _front_wheel_rest_y[i]
+			steering_node.rotation.y = lerp_angle(steering_node.rotation.y, rest_y + target_front_wheel_yaw, wheel_steer_weight)
+
+	_wheel_spin += _forward_speed * wheel_spin_multiplier * delta
+	for wheel: Node3D in wheel_nodes:
+		if wheel != null:
+			wheel.rotation.x = _wheel_spin
+
+
+func _apply_car_color_variant() -> void:
+	if visual_root == null:
+		return
+	var colors: Dictionary = _variant_colors(car_color_variant)
+	var primary: Color = colors["primary"]
+	var accent: Color = colors["accent"]
+	var dark: Color = colors["dark"]
+
+	_apply_mesh_color("VisualRoot/Body", primary, 0.42)
+	_apply_mesh_color("VisualRoot/SidePodL", primary, 0.42)
+	_apply_mesh_color("VisualRoot/SidePodR", primary, 0.42)
+	_apply_mesh_color("VisualRoot/NoseCone", accent, 0.35)
+	_apply_mesh_color("VisualRoot/RearWing", accent, 0.35)
+	_apply_mesh_color("VisualRoot/CenterFin", accent, 0.35)
+	_apply_mesh_color("VisualRoot/Cabin", dark, 0.18)
+	_apply_mesh_color("VisualRoot/FrontSplitter", dark, 0.28)
+	_apply_mesh_color("VisualRoot/RearWingPostL", dark, 0.28)
+	_apply_mesh_color("VisualRoot/RearWingPostR", dark, 0.28)
+
+
+func _variant_colors(variant_id: String) -> Dictionary:
+	match variant_id.to_lower():
+		"red":
+			return {
+				"primary": Color(0.94, 0.12, 0.08, 1.0),
+				"accent": Color(1.0, 0.78, 0.12, 1.0),
+				"dark": Color(0.06, 0.055, 0.075, 1.0),
+			}
+		"green":
+			return {
+				"primary": Color(0.08, 0.74, 0.32, 1.0),
+				"accent": Color(0.95, 0.96, 0.18, 1.0),
+				"dark": Color(0.035, 0.07, 0.055, 1.0),
+			}
+		"yellow":
+			return {
+				"primary": Color(1.0, 0.82, 0.08, 1.0),
+				"accent": Color(0.18, 0.42, 0.95, 1.0),
+				"dark": Color(0.07, 0.06, 0.04, 1.0),
+			}
+		_:
+			return {
+				"primary": Color(0.08, 0.24, 0.9, 1.0),
+				"accent": Color(1.0, 0.12, 0.08, 1.0),
+				"dark": Color(0.05, 0.07, 0.09, 1.0),
+			}
+
+
+func _apply_mesh_color(path: String, color: Color, roughness: float) -> void:
+	var mesh_node: MeshInstance3D = get_node_or_null(path) as MeshInstance3D
+	if mesh_node == null:
+		return
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = roughness
+	mesh_node.material_override = material
+
+
+func _apply_imported_model_material_override() -> void:
+	if not apply_imported_model_material_override:
+		return
+	var model_mount: Node = get_node_or_null("VisualRoot/ModelMount")
+	if model_mount == null:
+		return
+
+	var material := StandardMaterial3D.new()
+	material.resource_name = "RedMetallicImportedCarMaterial"
+	material.albedo_color = imported_model_albedo_tint
+	material.metallic = imported_model_metallic
+	material.roughness = imported_model_roughness
+
+	var albedo_texture: Texture2D = _load_texture(imported_model_albedo_texture_path)
+	if albedo_texture != null:
+		material.albedo_texture = albedo_texture
+
+	var normal_texture: Texture2D = _load_texture(imported_model_normal_texture_path)
+	if normal_texture != null:
+		material.normal_enabled = true
+		material.normal_texture = normal_texture
+
+	for mesh_instance: MeshInstance3D in _collect_mesh_instances(model_mount):
+		mesh_instance.material_override = material.duplicate()
+
+
+func _collect_mesh_instances(root: Node) -> Array[MeshInstance3D]:
+	var mesh_instances: Array[MeshInstance3D] = []
+	for child: Node in root.get_children():
+		if child is MeshInstance3D:
+			mesh_instances.append(child as MeshInstance3D)
+		mesh_instances.append_array(_collect_mesh_instances(child))
+	return mesh_instances
+
+
+func _load_texture(path: String) -> Texture2D:
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	return ResourceLoader.load(path) as Texture2D
+
+
+func _emit_drift_feedback() -> void:
+	if is_drifting and not _was_drifting:
+		drift_started.emit(drift_intensity)
+	elif not is_drifting and _was_drifting:
+		drift_ended.emit()
+
+	if absf(drift_intensity - _last_reported_drift_intensity) >= 0.04:
+		drift_intensity_changed.emit(drift_intensity)
+		_last_reported_drift_intensity = drift_intensity
+	_was_drifting = is_drifting
+
+
+func _apply_collision_recovery(previous_planar_velocity: Vector3) -> void:
+	var previous_speed: float = previous_planar_velocity.length()
+	if previous_speed < collision_min_response_speed:
+		return
+
+	var best_recovered_velocity: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	var strongest_impact: float = 0.0
+	for collision_index: int in range(get_slide_collision_count()):
+		var collision: KinematicCollision3D = get_slide_collision(collision_index)
+		if collision == null:
+			continue
+		var contact_normal: Vector3 = collision.get_normal()
+		var collider: Object = collision.get_collider()
+		if not _is_vehicle_collider(collider) and contact_normal.y > wall_contact_max_up_dot:
+			continue
+		var flat_normal: Vector3 = contact_normal
+		flat_normal.y = 0.0
+		if not flat_normal.is_finite() or flat_normal.length_squared() <= 0.0001:
+			continue
+		flat_normal = flat_normal.normalized()
+
+		var normal_impact: float = maxf(0.0, -previous_planar_velocity.dot(flat_normal))
+		if normal_impact < collision_min_response_speed or normal_impact <= strongest_impact:
+			continue
+
+		var head_on_weight: float = clampf(normal_impact / maxf(previous_speed, 0.001), 0.0, 1.0)
+		var retention: float = vehicle_bump_speed_retention if _is_vehicle_collider(collider) else lerpf(
+				wall_glance_speed_retention,
+				wall_head_on_speed_retention,
+				head_on_weight
+		)
+		var tangent_velocity: Vector3 = previous_planar_velocity.slide(flat_normal)
+		var push_away: Vector3 = flat_normal * normal_impact * collision_slide_push
+		if _is_vehicle_collider(collider):
+			push_away *= 0.65
+		var candidate_velocity: Vector3 = tangent_velocity * retention + push_away
+		var max_recovered_speed: float = previous_speed * 0.96
+		if candidate_velocity.length() > max_recovered_speed:
+			candidate_velocity = candidate_velocity.normalized() * max_recovered_speed
+		if candidate_velocity.is_finite():
+			best_recovered_velocity = candidate_velocity
+			strongest_impact = normal_impact
+
+	if strongest_impact <= 0.0:
+		return
+
+	velocity.x = best_recovered_velocity.x
+	velocity.z = best_recovered_velocity.z
+	_forward_speed = velocity.dot(_flat_forward())
+	_side_speed = velocity.dot(_flat_right())
+
+
+func _emit_collision_feedback(previous_planar_velocity: Vector3) -> void:
+	var impact_speed: float = previous_planar_velocity.length()
+	if impact_speed < 4.0:
+		return
+
+	for collision_index: int in range(get_slide_collision_count()):
+		var collision: KinematicCollision3D = get_slide_collision(collision_index)
+		if collision == null:
+			continue
+		var collider: Object = collision.get_collider()
+		var contact_normal: Vector3 = collision.get_normal()
+		var normal_impact: float = maxf(0.0, -previous_planar_velocity.dot(contact_normal))
+		var side_impact: float = absf(_side_speed)
+		var intensity: float = clampf((normal_impact + side_impact * 0.65) / 34.0, 0.08, 1.0)
+		var contact_position: Vector3 = collision.get_position()
+
+		if _is_vehicle_collider(collider):
+			if _vehicle_bump_cooldown <= 0.0:
+				vehicle_bumped.emit(intensity, contact_position, contact_normal)
+				_vehicle_bump_cooldown = 0.24
+		elif _is_guardrail_collider(collider):
+			if _wall_scrape_cooldown <= 0.0:
+				wall_scraped.emit(intensity, contact_position, contact_normal)
+				_wall_scrape_cooldown = 0.12
+
+
+func _is_vehicle_collider(collider: Object) -> bool:
+	if collider == null:
+		return false
+	if collider is ArcadeCarController:
+		return true
+	if collider is CharacterBody3D:
+		var collider_name: String = String((collider as Node).name).to_lower()
+		return collider_name.contains("car")
+	return false
+
+
+func _is_guardrail_collider(collider: Object) -> bool:
+	if collider == null or not (collider is Node):
+		return false
+	var node: Node = collider as Node
+	while node != null:
+		var node_name: String = String(node.name).to_lower()
+		if node_name.contains("guardrail") or node_name.contains("barrier") or node_name.contains("wall"):
+			return true
+		if _node_has_track_wall_metadata(node):
+			return true
+		if node.is_in_group("guardrails") or node.is_in_group("barriers") or node.is_in_group("track_walls"):
+			return true
+		node = node.get_parent()
+	return false
+
+
+func _node_has_track_wall_metadata(node: Node) -> bool:
+	for key: String in [
+		"collision_role",
+		"track_collision_role",
+		"collision_kind",
+		"track_part",
+		"role",
+		"kind",
+		"type",
+		"category",
+		"tag",
+		"tags",
+		"asset_kind",
+		"asset_type",
+	]:
+		if not node.has_meta(key):
+			continue
+		var value: String = String(node.get_meta(key)).to_lower()
+		if value.contains("guardrail") or value.contains("barrier") or value.contains("wall"):
+			return true
+	return false
+
+
+func _find_first_node3d(paths: Array[String]) -> Node3D:
+	for path: String in paths:
+		var node: Node = get_node_or_null(path)
+		if node is Node3D:
+			return node as Node3D
+	return null
+
+
+func _clear_driver_input_state() -> void:
+	if _driver_node != null and _driver_node.has_method("clear_input_state"):
+		_driver_node.call("clear_input_state")
+	if _fallback_player_driver != null and _fallback_player_driver.has_method("clear_input_state"):
+		_fallback_player_driver.call("clear_input_state")
+
+
+func _shape_axis(value: float, exponent: float) -> float:
+	value = clampf(_finite_or(value, 0.0), -1.0, 1.0)
+	exponent = maxf(_finite_or(exponent, 1.0), 0.01)
+	return signf(value) * pow(absf(value), exponent)
+
+
+func _update_surface_alignment(delta: float) -> void:
+	var current_up: Vector3 = _driving_up()
+	var target_up: Vector3 = Vector3.UP
+	var damping: float = air_surface_recovery_damping
+	if is_on_floor():
+		var floor_normal: Vector3 = get_floor_normal()
+		if floor_normal.is_finite() and floor_normal.length_squared() > 0.0001:
+			target_up = floor_normal.normalized()
+			var alignment_strength: float = clampf(_finite_or(ground_surface_alignment, 1.0), 0.0, 1.0)
+			target_up = Vector3.UP.slerp(target_up, alignment_strength).normalized()
+			damping = ground_surface_alignment_damping
+
+	_surface_up = current_up.slerp(target_up, _exp_weight(damping, delta)).normalized()
+	if not _surface_up.is_finite() or _surface_up.length_squared() <= 0.0001:
+		_surface_up = Vector3.UP
+	up_direction = _surface_up
+	_align_body_to_surface_up(_surface_up)
+
+
+func _align_body_to_surface_up(surface_up: Vector3) -> void:
+	if not surface_up.is_finite() or surface_up.length_squared() <= 0.0001:
+		return
+	var up: Vector3 = surface_up.normalized()
+	var forward: Vector3 = -global_transform.basis.z
+	forward = forward.slide(up)
+	if not forward.is_finite() or forward.length_squared() <= 0.0001:
+		var right_fallback: Vector3 = global_transform.basis.x.slide(up)
+		if not right_fallback.is_finite() or right_fallback.length_squared() <= 0.0001:
+			right_fallback = Vector3.RIGHT.slide(up)
+		if not right_fallback.is_finite() or right_fallback.length_squared() <= 0.0001:
+			right_fallback = Vector3.FORWARD.cross(up)
+		right_fallback = right_fallback.normalized()
+		forward = up.cross(right_fallback)
+	if not forward.is_finite() or forward.length_squared() <= 0.0001:
+		return
+	forward = forward.normalized()
+	var right: Vector3 = forward.cross(up)
+	if not right.is_finite() or right.length_squared() <= 0.0001:
+		return
+	right = right.normalized()
+	global_transform.basis = Basis(right, up, -forward).orthonormalized()
+
+
+func _drive_plane_velocity() -> Vector3:
+	var forward: Vector3 = _flat_forward()
+	var right: Vector3 = _flat_right()
+	return forward * velocity.dot(forward) + right * velocity.dot(right)
+
+
+func _driving_up() -> Vector3:
+	var up: Vector3 = _surface_up
+	if not up.is_finite() or up.length_squared() <= 0.0001:
+		up = global_transform.basis.y
+	if not up.is_finite() or up.length_squared() <= 0.0001:
+		return Vector3.UP
+	return up.normalized()
+
+
+func _flat_forward() -> Vector3:
+	var surface_up: Vector3 = _driving_up()
+	var forward: Vector3 = -global_transform.basis.z
+	forward = forward.slide(surface_up)
+	if not forward.is_finite() or forward.length_squared() <= 0.0001:
+		var fallback: Vector3 = Vector3.FORWARD.slide(surface_up)
+		if fallback.is_finite() and fallback.length_squared() > 0.0001:
+			return fallback.normalized()
+		return Vector3(0.0, 0.0, -1.0)
+	return forward.normalized()
+
+
+func _flat_right() -> Vector3:
+	var surface_up: Vector3 = _driving_up()
+	var forward: Vector3 = _flat_forward()
+	var right_from_forward: Vector3 = forward.cross(surface_up)
+	if right_from_forward.is_finite() and right_from_forward.length_squared() > 0.0001:
+		return right_from_forward.normalized()
+	var right: Vector3 = global_transform.basis.x
+	right = right.slide(surface_up)
+	if not right.is_finite() or right.length_squared() <= 0.0001:
+		return Vector3.RIGHT
+	return right.normalized()
+
+
+func _sanitize_physics_state() -> void:
+	if not velocity.is_finite():
+		velocity = Vector3.ZERO
+		_forward_speed = 0.0
+		_side_speed = 0.0
+
+	var current_basis: Basis = global_transform.basis
+	if not current_basis.x.is_finite() or not current_basis.y.is_finite() or not current_basis.z.is_finite() \
+			or current_basis.x.length_squared() <= 0.0001 \
+			or current_basis.y.length_squared() <= 0.0001 \
+			or current_basis.z.length_squared() <= 0.0001:
+		var safe_origin: Vector3 = global_transform.origin if global_transform.origin.is_finite() else Vector3.ZERO
+		global_transform = Transform3D(Basis.IDENTITY, safe_origin)
+		velocity = Vector3.ZERO
+		_forward_speed = 0.0
+		_side_speed = 0.0
+		_surface_up = Vector3.UP
+		up_direction = Vector3.UP
+		return
+
+	global_transform.basis = current_basis.orthonormalized()
+
+
+func _sync_character_body_grounding_settings() -> void:
+	floor_snap_length = maxf(_finite_or(ground_snap_length_m, 0.0), 0.0)
+	floor_max_angle = deg_to_rad(clampf(_finite_or(floor_max_angle_degrees, 45.0), 0.0, 85.0))
+	up_direction = _driving_up()
+
+
+func _exp_weight(damping: float, delta: float) -> float:
+	return 1.0 - exp(-maxf(_finite_or(damping, 0.0), 0.0) * maxf(delta, 0.0))
+
+
+func _is_finite_float(value: float) -> bool:
+	return not is_nan(value) and not is_inf(value)
+
+
+func _finite_or(value: float, fallback: float) -> float:
+	if is_nan(value) or is_inf(value):
+		return fallback
+	return value

@@ -1,0 +1,3082 @@
+extends Control
+
+const FigmaUIFontScript := preload("res://scripts/ui/figma_ui_fonts.gd")
+const RACE_LOADING_SCENE_PATH: String = "res://scenes/ui/race_loading.tscn"
+const MENU_AUDIO_CONTROLLER_SCRIPT_PATH: String = "res://scripts/audio/menu_audio_controller.gd"
+const MENU_BACKGROUND_TEXTURE_PATH: String = "res://assets/ui/menu_showroom_background.png"
+const DEFAULT_CAR_CARD_TEXTURE_PATH: String = MENU_BACKGROUND_TEXTURE_PATH
+const GARAGE_SHOWROOM_SCENE_PATH: String = "res://scenes/ui/garage_showroom.tscn"
+const GARAGE_PLATFORM_MODEL_PATH: String = "res://assets/ui/showroom/platform/rotation_platform.glb"
+const HANGAR_FLOOR_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_floor_workshop_concrete_4k.png"
+const HANGAR_FLOOR_NORMAL_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_floor_workshop_concrete_4k_normal.png"
+const HANGAR_WALL_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_wall_generated.png"
+const HANGAR_WALL_TILE_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_wall_tileable.png"
+const HANGAR_WALL_PANEL_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_wall_panels_4k.png"
+const HANGAR_WALL_NORMAL_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_wall_panels_4k_normal.png"
+const HANGAR_CEILING_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_ceiling_panels_4k.png"
+const HANGAR_CEILING_NORMAL_TEXTURE_PATH: String = "res://assets/ui/showroom/hangar_ceiling_panels_4k_normal.png"
+const GARAGE_PLATFORM_SCALE: float = 2.746472
+const GARAGE_PLATFORM_POSITION: Vector3 = Vector3(0.0025858446, 0.23249164, 0.0022535285)
+const GARAGE_PLATFORM_TOP_Y: float = 0.4894
+
+const VIEW_HOME: StringName = &"home"
+const VIEW_CAR_SELECT: StringName = &"car_select"
+const VIEW_TRACK_SELECT: StringName = &"track_select"
+const STAT_ORDER: Array[String] = ["speed", "launch", "braking", "cornering"]
+const STAT_LABELS: Dictionary = {
+	"speed": "Top Speed",
+	"launch": "Launch",
+	"braking": "Braking",
+	"cornering": "Cornering",
+}
+const STAT_COLORS: Dictionary = {
+	"speed": Color(0.92, 0.92, 0.90, 1.0),
+	"launch": Color(0.74, 0.74, 0.72, 1.0),
+	"braking": Color(0.62, 0.65, 0.68, 1.0),
+	"cornering": Color(0.82, 0.84, 0.80, 1.0),
+}
+const CHOICE_CARD_SIDE_RATIO: float = 0.10
+const CARD_SCROLL_TWEEN_SECONDS: float = 0.24
+const PREVIEW_CAMERA_ELEVATION_DEGREES: float = 24.0
+const PREVIEW_CAMERA_DISTANCE: float = 6.5
+const PREVIEW_CAMERA_TARGET_OFFSET_X: float = 0.55
+const PREVIEW_IDLE_ROTATION_DEGREES_PER_SECOND: float = 8.0
+const SELECTION_INFO_RAIL_RATIO: float = 0.19
+const UI_REFERENCE_SIZE: Vector2 = Vector2(1920.0, 1080.0)
+const UI_MIN_SCALE: float = 0.50
+const UI_MAX_SCALE: float = 2.25
+const COLOR_PANEL_DARK: Color = Color(0.020, 0.024, 0.031, 0.92)
+const COLOR_PANEL_LIGHT: Color = Color(0.055, 0.064, 0.078, 0.86)
+const COLOR_RACING_RED: Color = Color(0.58, 0.035, 0.055, 1.0)
+const COLOR_RACING_RED_HOVER: Color = Color(0.76, 0.075, 0.095, 1.0)
+const COLOR_RACING_BLUE: Color = Color(0.36, 0.82, 1.0, 1.0)
+const COLOR_TEXT_MAIN: Color = Color(0.94, 0.94, 0.94, 1.0)
+const COLOR_TEXT_MUTED: Color = Color(0.48, 0.48, 0.60, 1.0)
+const GEAR_MODE_AUTOMATIC: String = "automatic"
+const GEAR_MODE_MANUAL: String = "manual"
+
+var _active_view: StringName = VIEW_HOME
+var _settings_visible: bool = false
+var _selected_car_id: StringName = &""
+var _selected_skin_id: StringName = &""
+var _selected_track_id: StringName = &""
+var _preview_car_id: StringName = &""
+var _preview_track_id: StringName = &""
+var _selected_difficulty_id: String = "medium"
+var _selected_gear_mode: String = GEAR_MODE_AUTOMATIC
+var _menu_audio: Node = null
+var _menu_background_texture: Texture2D = null
+var _car_card_texture: Texture2D = null
+var _rebuild_queued: bool = false
+
+var _home_view: Control = null
+var _car_select_view: Control = null
+var _track_select_view: Control = null
+var _settings_panel: Control = null
+var _master_slider: HSlider = null
+var _music_slider: HSlider = null
+var _sfx_slider: HSlider = null
+var _brightness_slider: HSlider = null
+var _master_value_label: Label = null
+var _music_value_label: Label = null
+var _sfx_value_label: Label = null
+var _brightness_value_label: Label = null
+var _car_name_label: Label = null
+var _car_class_label: Label = null
+var _car_description_label: Label = null
+var _track_name_label: Label = null
+var _track_description_label: Label = null
+var _track_meta_label: Label = null
+var _track_length_label: Label = null
+var _track_lap_label: Label = null
+var _track_difficulty_label: Label = null
+var _track_environment_label: Label = null
+var _track_preview_texture_rect: TextureRect = null
+var _preview_subviewport: SubViewport = null
+var _preview_turntable: Node3D = null
+var _preview_car_mount: Node3D = null
+var _preview_camera: Camera3D = null
+var _preview_dragging: bool = false
+var _preview_last_mouse: Vector2 = Vector2.ZERO
+var _preview_turntable_yaw_degrees: float = 0.0
+var _car_cards_scroll: ScrollContainer = null
+var _track_cards_scroll: ScrollContainer = null
+var _car_cards_scroll_tween: Tween = null
+var _track_cards_scroll_tween: Tween = null
+var _car_cards_leading_spacer: Control = null
+var _car_cards_trailing_spacer: Control = null
+var _track_cards_leading_spacer: Control = null
+var _track_cards_trailing_spacer: Control = null
+var _car_prev_button: Button = null
+var _car_next_button: Button = null
+var _track_prev_button: Button = null
+var _track_next_button: Button = null
+var _car_buttons: Dictionary = {}
+var _skin_buttons: Dictionary = {}
+var _track_buttons: Dictionary = {}
+var _difficulty_buttons: Dictionary = {}
+var _gear_mode_buttons: Dictionary = {}
+var _car_stat_labels: Dictionary = {}
+var _car_stat_bars: Dictionary = {}
+var _car_preview_scene_cache: Dictionary = {}
+var _difficulty_description_label: Label = null
+var _race_now_button: Button = null
+
+
+func _ready() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	if not get_viewport().size_changed.is_connected(Callable(self, "_queue_rebuild")):
+		get_viewport().size_changed.connect(Callable(self, "_queue_rebuild"))
+	_sync_from_session()
+	_build_interface()
+	call_deferred("_start_menu_audio")
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and is_inside_tree():
+		_queue_rebuild()
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_go_back()
+
+
+func _process(delta: float) -> void:
+	_update_car_preview_idle_rotation(delta)
+
+
+func _build_interface() -> void:
+	_kill_card_scroll_tweens()
+	if _preview_turntable != null and is_instance_valid(_preview_turntable):
+		_preview_turntable_yaw_degrees = _preview_turntable.rotation_degrees.y
+	for child: Node in get_children():
+		remove_child(child)
+		child.queue_free()
+	_car_buttons.clear()
+	_skin_buttons.clear()
+	_track_buttons.clear()
+	_difficulty_buttons.clear()
+	_gear_mode_buttons.clear()
+	_car_stat_labels.clear()
+	_car_stat_bars.clear()
+	_track_preview_texture_rect = null
+	_difficulty_description_label = null
+	_race_now_button = null
+	_car_cards_scroll = null
+	_track_cards_scroll = null
+	_car_cards_leading_spacer = null
+	_car_cards_trailing_spacer = null
+	_track_cards_leading_spacer = null
+	_track_cards_trailing_spacer = null
+	_car_prev_button = null
+	_car_next_button = null
+	_track_prev_button = null
+	_track_next_button = null
+	_preview_subviewport = null
+	_preview_turntable = null
+	_preview_car_mount = null
+	_preview_camera = null
+	_track_length_label = null
+	_track_lap_label = null
+	_track_difficulty_label = null
+	_track_environment_label = null
+
+	_add_background()
+
+	_home_view = _build_home_view()
+	_car_select_view = _build_car_select_view()
+	_track_select_view = _build_track_select_view()
+	add_child(_home_view)
+	add_child(_car_select_view)
+	add_child(_track_select_view)
+
+	_show_view(_active_view, false)
+	_sync_all_ui()
+	FigmaUIFontScript.apply_tree(self)
+	call_deferred("_bind_menu_audio")
+
+
+func _add_background() -> void:
+	var base := ColorRect.new()
+	base.name = "Background"
+	base.color = Color(0.012, 0.014, 0.017, 1.0)
+	base.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(base)
+
+	var texture := TextureRect.new()
+	texture.name = "ShowroomBackground"
+	texture.texture = _get_menu_background_texture()
+	texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	texture.modulate = Color(0.88, 0.92, 1.0, 0.82)
+	texture.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(texture)
+
+	var shade := ColorRect.new()
+	shade.name = "CinematicScrim"
+	shade.color = Color(0.0, 0.0, 0.0, 0.56)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
+
+	var left_vignette := ColorRect.new()
+	left_vignette.name = "LeftVignette"
+	left_vignette.color = Color(0.0, 0.0, 0.0, 0.34)
+	left_vignette.anchor_left = 0.0
+	left_vignette.anchor_top = 0.0
+	left_vignette.anchor_right = 0.38
+	left_vignette.anchor_bottom = 1.0
+	add_child(left_vignette)
+
+	var bottom_strip := ColorRect.new()
+	bottom_strip.name = "BottomRedAccent"
+	bottom_strip.color = Color(1.0, 1.0, 1.0, 0.10)
+	bottom_strip.anchor_left = 0.0
+	bottom_strip.anchor_top = 1.0
+	bottom_strip.anchor_right = 1.0
+	bottom_strip.anchor_bottom = 1.0
+	bottom_strip.offset_top = -_space(4, 8)
+	add_child(bottom_strip)
+
+
+func _build_home_view() -> Control:
+	var root := Control.new()
+	root.name = "Home"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(_make_home_background_overlay())
+
+	var center := CenterContainer.new()
+	center.name = "HomeCenter"
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+
+	var actions := VBoxContainer.new()
+	actions.name = "HomePrimaryStack"
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.custom_minimum_size = Vector2(_vw(0.43, 520.0, 820.0), 0.0)
+	actions.add_theme_constant_override("separation", _space(14, 24))
+	center.add_child(actions)
+
+	actions.add_child(_make_home_eyebrow())
+	actions.add_child(_make_home_brand())
+
+	var subtitle := _make_label("PUSH BEYOND THE LIMIT", _font_px(12, 18, 0.016), Color(0.52, 0.50, 0.66, 1.0), false)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	actions.add_child(subtitle)
+
+	var button_gap := Control.new()
+	button_gap.custom_minimum_size = Vector2(1.0, _space(24, 42))
+	actions.add_child(button_gap)
+
+	var start_button := _make_button("START RACE", true, _font_px(19, 28, 0.026), _vh(0.070, 58.0, 78.0))
+	start_button.custom_minimum_size.x = _vw(0.24, 320.0, 460.0)
+	start_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	start_button.pressed.connect(Callable(self, "_show_car_select"))
+	actions.add_child(start_button)
+
+	var settings_button := _make_home_settings_button()
+	settings_button.pressed.connect(Callable(self, "_toggle_settings"))
+	actions.add_child(settings_button)
+
+	_settings_panel = _build_settings_panel()
+	_settings_panel.visible = _settings_visible
+	_settings_panel.anchor_left = 0.70
+	_settings_panel.anchor_top = 0.20
+	_settings_panel.anchor_right = 0.96
+	_settings_panel.anchor_bottom = 0.88
+	_settings_panel.offset_left = 0.0
+	_settings_panel.offset_top = 0.0
+	_settings_panel.offset_right = 0.0
+	_settings_panel.offset_bottom = 0.0
+	root.add_child(_settings_panel)
+	return root
+
+
+func _make_home_background_overlay() -> Control:
+	var overlay := Control.new()
+	overlay.name = "HomeFigmaOverlay"
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	var dark := ColorRect.new()
+	dark.name = "DarkGridBase"
+	dark.color = Color(0.006, 0.007, 0.011, 0.94)
+	dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(dark)
+
+	var red_core := ColorRect.new()
+	red_core.name = "RedCoreGlow"
+	red_core.color = Color(0.22, 0.0, 0.035, 0.045)
+	red_core.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	red_core.anchor_left = 0.22
+	red_core.anchor_top = 0.26
+	red_core.anchor_right = 0.78
+	red_core.anchor_bottom = 0.62
+	overlay.add_child(red_core)
+
+	for index: int in range(1, 16):
+		var line := ColorRect.new()
+		line.name = "VerticalGridLine"
+		line.color = Color(1.0, 0.05, 0.12, 0.045)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var ratio := float(index) / 16.0
+		line.anchor_left = ratio
+		line.anchor_right = ratio
+		line.anchor_top = 0.0
+		line.anchor_bottom = 1.0
+		line.offset_right = 1.0
+		overlay.add_child(line)
+
+	for index: int in range(1, 10):
+		var line := ColorRect.new()
+		line.name = "HorizontalGridLine"
+		line.color = Color(1.0, 0.05, 0.12, 0.040)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var ratio := float(index) / 10.0
+		line.anchor_left = 0.0
+		line.anchor_right = 1.0
+		line.anchor_top = ratio
+		line.anchor_bottom = ratio
+		line.offset_bottom = 1.0
+		overlay.add_child(line)
+
+	return overlay
+
+
+func _make_home_eyebrow() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "HomeEyebrow"
+	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", _space(10, 18))
+
+	for side: int in range(2):
+		if side == 1:
+			var label := _make_label("RACING SERIES", _font_px(9, 13, 0.012), COLOR_RACING_RED, false)
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			row.add_child(label)
+		var line := ColorRect.new()
+		line.color = Color(COLOR_RACING_RED, 0.66)
+		line.custom_minimum_size = Vector2(_space(42, 68), 1.0)
+		row.add_child(line)
+	return row
+
+
+func _make_home_brand() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "HomeBrand"
+	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 0)
+
+	var summer := _make_label("SUMMER", _font_px(62, 112, 0.096), Color(0.86, 0.85, 0.86, 1.0), true)
+	summer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(summer)
+
+	var racer := _make_label("RACER", _font_px(62, 112, 0.096), COLOR_RACING_RED, true)
+	racer.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	row.add_child(racer)
+	return row
+
+
+func _make_home_settings_button() -> Button:
+	var button := Button.new()
+	button.name = "SettingsButton"
+	button.text = "SETTINGS"
+	button.custom_minimum_size = Vector2(_vw(0.24, 320.0, 460.0), _vh(0.052, 42.0, 58.0))
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", _font_px(13, 19, 0.018))
+	button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.0), Color(0.36, 0.34, 0.48, 0.35), 1, 0))
+	button.add_theme_stylebox_override("hover", _make_panel_style(Color(0.08, 0.075, 0.12, 0.34), Color(0.62, 0.60, 0.80, 0.62), 1, 0))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(Color(0.12, 0.020, 0.035, 0.44), COLOR_RACING_RED, 1, 0))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, COLOR_RACING_BLUE, 2, 0))
+	button.add_theme_color_override("font_color", Color(0.58, 0.56, 0.72, 1.0))
+	button.add_theme_color_override("font_hover_color", COLOR_TEXT_MAIN)
+	button.add_theme_color_override("font_pressed_color", COLOR_TEXT_MAIN)
+	return button
+
+
+func _build_settings_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = "SettingsPanel"
+	panel.custom_minimum_size = Vector2(_vw(0.22, 300.0, 420.0), 0.0)
+	panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.050, 0.058, 0.094, 0.96), Color(1.0, 1.0, 1.0, 0.08), 1, 0))
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", _space(20, 28))
+	margin.add_theme_constant_override("margin_top", _space(18, 26))
+	margin.add_theme_constant_override("margin_right", _space(20, 28))
+	margin.add_theme_constant_override("margin_bottom", _space(18, 26))
+	panel.add_child(margin)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", _space(18, 28))
+	margin.add_child(content)
+
+	var header := HBoxContainer.new()
+	header.name = "SettingsHeader"
+	header.add_theme_constant_override("separation", _space(8, 12))
+	content.add_child(header)
+	var accent := ColorRect.new()
+	accent.color = COLOR_RACING_RED
+	accent.custom_minimum_size = Vector2(3.0, _space(22, 34))
+	header.add_child(accent)
+	var title := _make_label("SETTINGS", _font_px(15, 22, 0.020), Color(0.94, 0.94, 0.94, 1.0), true)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+
+	var master_row := _make_slider_row("Global", Callable(self, "_on_master_percent_changed"))
+	_master_slider = master_row["slider"]
+	_master_value_label = master_row["value_label"]
+	content.add_child(master_row["root"])
+	var music_row := _make_slider_row("Music", Callable(self, "_on_music_percent_changed"))
+	_music_slider = music_row["slider"]
+	_music_value_label = music_row["value_label"]
+	content.add_child(music_row["root"])
+	var sfx_row := _make_slider_row("SFX", Callable(self, "_on_sfx_percent_changed"))
+	_sfx_slider = sfx_row["slider"]
+	_sfx_value_label = sfx_row["value_label"]
+	content.add_child(sfx_row["root"])
+	var brightness_row := _make_slider_row("Brightness", Callable(self, "_on_brightness_percent_changed"))
+	_brightness_slider = brightness_row["slider"]
+	_brightness_value_label = brightness_row["value_label"]
+	content.add_child(brightness_row["root"])
+
+	var close_button := _make_button("SAVE & CLOSE", true, _font_px(12, 17, 0.016), _vh(0.052, 42.0, 58.0))
+	close_button.pressed.connect(Callable(self, "_toggle_settings"))
+	content.add_child(close_button)
+	return panel
+
+
+func _build_car_select_view() -> Control:
+	var root := Control.new()
+	root.name = "CarSelect"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var layout := VBoxContainer.new()
+	layout.name = "CarSelectLayout"
+	layout.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layout.add_theme_constant_override("separation", 0)
+	root.add_child(layout)
+	layout.add_child(_make_selection_header("SELECT CAR", Callable(self, "_show_home")))
+
+	var body := Control.new()
+	body.name = "CarSelectBody"
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	layout.add_child(body)
+	var hero := _make_car_hero_area()
+	hero.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hero.offset_left = 0.0
+	hero.offset_top = 0.0
+	hero.offset_right = 0.0
+	hero.offset_bottom = 0.0
+	body.add_child(hero)
+	var rail := _build_car_info_rail()
+	var rail_margin := _space(18, 30)
+	rail.anchor_left = 1.0
+	rail.anchor_top = 0.0
+	rail.anchor_right = 1.0
+	rail.anchor_bottom = 1.0
+	rail.offset_left = -_info_rail_width() - rail_margin
+	rail.offset_top = _space(22, 36)
+	rail.offset_right = -rail_margin
+	rail.offset_bottom = -_space(18, 30)
+	layout.add_child(_build_car_carousel())
+	# Same overlay treatment as the track view: the car rail carries the
+	# CONFIRM button, which the growing carousel panel would otherwise
+	# swallow in wide or short windows.
+	rail.offset_top = _vh(0.082, 58.0, 76.0) + _space(22, 36)
+	root.add_child(rail)
+	return root
+
+
+func _build_track_select_view() -> Control:
+	var root := Control.new()
+	root.name = "TrackSelect"
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var layout := VBoxContainer.new()
+	layout.name = "TrackSelectLayout"
+	layout.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layout.add_theme_constant_override("separation", 0)
+	root.add_child(layout)
+	layout.add_child(_make_selection_header("SELECT TRACK", Callable(self, "_show_car_select")))
+
+	var body := Control.new()
+	body.name = "TrackSelectBody"
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	layout.add_child(body)
+	var hero := _make_track_hero_area()
+	hero.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hero.offset_left = 0.0
+	hero.offset_top = 0.0
+	hero.offset_right = 0.0
+	hero.offset_bottom = 0.0
+	body.add_child(hero)
+	var rail := _build_track_info_rail()
+	var rail_margin := _space(18, 30)
+	rail.anchor_left = 1.0
+	rail.anchor_top = 0.0
+	rail.anchor_right = 1.0
+	rail.anchor_bottom = 1.0
+	rail.offset_left = -_info_rail_width() - rail_margin
+	rail.offset_top = _space(22, 36)
+	rail.offset_right = -rail_margin
+	rail.offset_bottom = -_space(18, 30)
+	layout.add_child(_build_track_carousel())
+	# The rail carries the RACE NOW stack. Parent it to the view root, added
+	# after the bottom carousel: in wide or short windows the carousel panel
+	# grows upward into the rail's space, and as the later sibling it would
+	# draw over the button and take its clicks. As the last child of the root
+	# the rail always renders and picks on top of the bottom panel instead.
+	rail.offset_top = _vh(0.082, 58.0, 76.0) + _space(22, 36)
+	root.add_child(rail)
+	return root
+
+
+func _make_selection_header(title_text: String, back_callback: Callable) -> PanelContainer:
+	var header := PanelContainer.new()
+	header.name = "SelectionHeader"
+	header.custom_minimum_size = Vector2(1.0, _vh(0.082, 58.0, 76.0))
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_theme_stylebox_override("panel", _make_panel_style(Color(0.010, 0.012, 0.020, 0.96), Color(1.0, 1.0, 1.0, 0.06), 1, 0))
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", _space(18, 28))
+	margin.add_theme_constant_override("margin_right", _space(18, 28))
+	margin.add_theme_constant_override("margin_top", _space(8, 12))
+	margin.add_theme_constant_override("margin_bottom", _space(8, 12))
+	header.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.name = "HeaderRow"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", _space(12, 18))
+	margin.add_child(row)
+
+	var side_width := _space(98, 132)
+	var back := _make_top_bar_button("<  BACK")
+	back.custom_minimum_size.x = side_width
+	back.pressed.connect(back_callback)
+	row.add_child(back)
+
+	var center := HBoxContainer.new()
+	center.name = "HeaderTitle"
+	center.alignment = BoxContainer.ALIGNMENT_CENTER
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.add_theme_constant_override("separation", _space(8, 12))
+	row.add_child(center)
+	var red_mark := ColorRect.new()
+	red_mark.color = Color(0.86, 0.86, 0.82, 1.0)
+	red_mark.custom_minimum_size = Vector2(_space(14, 18), _space(14, 18))
+	center.add_child(red_mark)
+	var title := _make_label(title_text, _font_px(13, 18, 0.017), COLOR_TEXT_MAIN, true)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	center.add_child(title)
+
+	var right_balance := Control.new()
+	right_balance.name = "HeaderRightBalance"
+	right_balance.custom_minimum_size = Vector2(side_width, 1.0)
+	row.add_child(right_balance)
+	return header
+
+
+func _make_car_hero_area() -> Control:
+	var area := Control.new()
+	area.name = "CarHeroArea"
+	area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	area.clip_contents = true
+
+	var glow := ColorRect.new()
+	glow.name = "CarHeroRedGlow"
+	glow.color = Color(1.0, 1.0, 1.0, 0.045)
+	glow.anchor_left = 0.16
+	glow.anchor_top = 0.54
+	glow.anchor_right = 0.86
+	glow.anchor_bottom = 1.0
+	area.add_child(glow)
+
+	var preview := _build_car_preview_column()
+	preview.add_theme_stylebox_override("panel", _make_panel_style(Color(0.0, 0.0, 0.0, 0.0), Color(1.0, 1.0, 1.0, 0.0), 0, 0))
+	preview.set_anchors_preset(Control.PRESET_FULL_RECT)
+	preview.offset_left = _space(16, 28)
+	preview.offset_top = _space(12, 22)
+	preview.offset_right = -_space(16, 28)
+	preview.offset_bottom = -_space(12, 22)
+	area.add_child(preview)
+	return area
+
+
+func _build_car_info_rail() -> Control:
+	var rail := _make_info_rail_slot("CarInfoRail")
+	var panel := rail.get_node("CarInfoRail") as PanelContainer
+	var content := _make_info_rail_content(panel)
+
+	var car := _displayed_car_option()
+	var class_chip := _make_chip_label("CLASS  %s" % str(car.get("vehicle_class", "GT")).to_upper())
+	content.add_child(class_chip)
+
+	_car_name_label = _make_label("", _font_px(19, 28, 0.026), COLOR_TEXT_MAIN, true)
+	_configure_top_title_label(_car_name_label)
+	content.add_child(_car_name_label)
+	_car_class_label = _make_label("", _font_px(10, 14, 0.013), Color(0.74, 0.74, 0.78, 1.0), true)
+	content.add_child(_car_class_label)
+	_car_description_label = _make_label("", _font_px(11, 14, 0.013), Color(0.58, 0.58, 0.64, 1.0), false)
+	_car_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_car_description_label.max_lines_visible = 3
+	_car_description_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	content.add_child(_car_description_label)
+
+	content.add_child(_make_section_label("PERFORMANCE"))
+	var stats: Dictionary = car.get("stats", {})
+	for stat_name: String in STAT_ORDER:
+		var row := _make_compact_stat_row(STAT_LABELS.get(stat_name, stat_name), int(stats.get(stat_name, 0)), STAT_COLORS.get(stat_name, Color.WHITE))
+		_car_stat_labels[stat_name] = row.get_child(0)
+		_car_stat_bars[stat_name] = row.get_child(1)
+		content.add_child(row)
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(spacer)
+	content.add_child(_build_gear_mode_toggle())
+	var confirm := _make_button("CONFIRM", true, _font_px(12, 18, 0.017), _vh(0.054, 42.0, 58.0))
+	confirm.pressed.connect(Callable(self, "_show_track_select"))
+	content.add_child(confirm)
+	return rail
+
+
+func _make_track_hero_area() -> Control:
+	var area := Control.new()
+	area.name = "TrackHeroArea"
+	area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	area.clip_contents = true
+
+	_track_preview_texture_rect = TextureRect.new()
+	_track_preview_texture_rect.name = "TrackHeroImage"
+	_track_preview_texture_rect.texture = _load_track_preview_texture(_displayed_track_option())
+	_track_preview_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_track_preview_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_track_preview_texture_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_track_preview_texture_rect.modulate = Color(1.0, 1.0, 1.0, 0.72)
+	area.add_child(_track_preview_texture_rect)
+
+	var right_scrim := ColorRect.new()
+	right_scrim.name = "RightScrim"
+	right_scrim.color = Color(0.007, 0.008, 0.013, 0.34)
+	right_scrim.anchor_left = 0.58
+	right_scrim.anchor_right = 1.0
+	right_scrim.anchor_top = 0.0
+	right_scrim.anchor_bottom = 1.0
+	area.add_child(right_scrim)
+
+	var bottom_scrim := ColorRect.new()
+	bottom_scrim.name = "BottomScrim"
+	bottom_scrim.color = Color(0.007, 0.008, 0.013, 0.72)
+	bottom_scrim.anchor_left = 0.0
+	bottom_scrim.anchor_right = 1.0
+	bottom_scrim.anchor_top = 0.62
+	bottom_scrim.anchor_bottom = 1.0
+	area.add_child(bottom_scrim)
+
+	var title_stack := VBoxContainer.new()
+	title_stack.name = "TrackHeroTitle"
+	title_stack.anchor_left = 0.045
+	title_stack.anchor_right = 0.58
+	title_stack.anchor_top = 0.68
+	title_stack.anchor_bottom = 0.94
+	title_stack.add_theme_constant_override("separation", _space(4, 8))
+	area.add_child(title_stack)
+	_track_meta_label = _make_label("", _font_px(10, 14, 0.013), Color(0.48, 0.48, 0.62, 1.0), false)
+	title_stack.add_child(_track_meta_label)
+	_track_name_label = _make_label("", _font_px(28, 48, 0.044), COLOR_TEXT_MAIN, true)
+	_configure_top_title_label(_track_name_label)
+	title_stack.add_child(_track_name_label)
+	return area
+
+
+func _build_track_info_rail() -> Control:
+	var rail := _make_info_rail_slot("TrackInfoRail")
+	var panel := rail.get_node("TrackInfoRail") as PanelContainer
+	var content := _make_info_rail_content(panel)
+	content.add_child(_make_section_label("CIRCUIT LAYOUT"))
+	var map_panel := PanelContainer.new()
+	map_panel.custom_minimum_size = Vector2(1.0, _vh(0.15, 104.0, 150.0))
+	map_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.015, 0.018, 0.028, 0.82), Color(1.0, 1.0, 1.0, 0.08), 1, 0))
+	content.add_child(map_panel)
+	var map_label := _make_label("ROUTE MAP", _font_px(13, 18, 0.017), Color(0.42, 0.42, 0.56, 1.0), true)
+	map_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	map_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	map_panel.add_child(map_label)
+
+	content.add_child(_make_section_label("TRACK INFO"))
+	_track_length_label = _make_label("", _font_px(12, 16, 0.015), COLOR_TEXT_MAIN, true)
+	content.add_child(_make_info_value_row("Length", _track_length_label))
+	_track_lap_label = _make_label("", _font_px(12, 16, 0.015), COLOR_TEXT_MAIN, true)
+	content.add_child(_make_info_value_row("Race Laps", _track_lap_label))
+	_track_environment_label = _make_label("", _font_px(12, 16, 0.015), COLOR_TEXT_MAIN, true)
+	content.add_child(_make_info_value_row("Weather", _track_environment_label))
+	_track_difficulty_label = _make_label("", _font_px(11, 15, 0.014), COLOR_RACING_RED, true)
+	content.add_child(_make_info_value_row("Difficulty", _track_difficulty_label))
+
+	content.add_child(_make_section_label("ROUTE BRIEF"))
+	_track_description_label = _make_label("", _font_px(13, 17, 0.016), Color(0.66, 0.68, 0.76, 1.0), false)
+	_track_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_track_description_label.max_lines_visible = 4
+	_track_description_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	content.add_child(_track_description_label)
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(spacer)
+
+	var bottom_stack := VBoxContainer.new()
+	bottom_stack.name = "TrackStartStack"
+	bottom_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom_stack.add_theme_constant_override("separation", _space(8, 12))
+	content.add_child(bottom_stack)
+	bottom_stack.add_child(_make_section_label("RIVAL DIFFICULTY"))
+
+	var difficulty_row := HBoxContainer.new()
+	difficulty_row.name = "DifficultyRow"
+	difficulty_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	difficulty_row.add_theme_constant_override("separation", _space(6, 10))
+	bottom_stack.add_child(difficulty_row)
+	for difficulty: Dictionary in _difficulty_options():
+		var button := _make_difficulty_button(difficulty)
+		_difficulty_buttons[StringName(difficulty.get("id", &""))] = button
+		difficulty_row.add_child(button)
+	_difficulty_description_label = _make_label("", _font_px(12, 16, 0.014), COLOR_TEXT_MUTED, false)
+	_difficulty_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_difficulty_description_label.custom_minimum_size = Vector2(1.0, _vh(0.050, 36.0, 54.0))
+	_difficulty_description_label.max_lines_visible = 2
+	_difficulty_description_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	bottom_stack.add_child(_difficulty_description_label)
+
+	_race_now_button = _make_button("RACE NOW", true, _font_px(12, 18, 0.017), _vh(0.054, 42.0, 58.0))
+	_race_now_button.pressed.connect(Callable(self, "_start_race_loading"))
+	bottom_stack.add_child(_race_now_button)
+	return rail
+
+
+func _make_info_rail_slot(node_name: String) -> Control:
+	var rail := Control.new()
+	rail.name = "%sSlot" % node_name
+	rail.custom_minimum_size = Vector2(_info_rail_width(), 1.0)
+	rail.size_flags_horizontal = Control.SIZE_SHRINK_END
+	rail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rail.clip_contents = true
+
+	var panel := _make_info_rail_panel(node_name)
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.offset_left = 0.0
+	panel.offset_top = 0.0
+	panel.offset_right = 0.0
+	panel.offset_bottom = 0.0
+	rail.add_child(panel)
+	return rail
+
+
+func _make_info_rail_panel(node_name: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = node_name
+	panel.custom_minimum_size = Vector2.ZERO
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.clip_contents = true
+	panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.050, 0.058, 0.094, 0.96), Color(1.0, 1.0, 1.0, 0.08), 1, 0))
+	return panel
+
+
+func _make_info_rail_content(panel: PanelContainer) -> VBoxContainer:
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", _space(16, 24))
+	margin.add_theme_constant_override("margin_top", _space(16, 24))
+	margin.add_theme_constant_override("margin_right", _space(16, 24))
+	margin.add_theme_constant_override("margin_bottom", _space(16, 24))
+	panel.add_child(margin)
+	var content := VBoxContainer.new()
+	content.name = "InfoContent"
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", _space(10, 16))
+	margin.add_child(content)
+	return content
+
+
+func _make_section_label(text: String) -> Label:
+	var label := _make_label(text, _font_px(9, 13, 0.012), Color(0.36, 0.36, 0.50, 1.0), true)
+	label.text = text.to_upper()
+	return label
+
+
+func _make_chip_label(text: String) -> PanelContainer:
+	var chip := PanelContainer.new()
+	chip.name = "Chip"
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	chip.add_theme_stylebox_override("panel", _make_panel_style(Color(0.90, 0.90, 0.86, 0.92), Color(1.0, 1.0, 1.0, 0.20), 0, 0))
+	var label := _make_label(text, _font_px(10, 14, 0.013), Color(0.025, 0.026, 0.030, 1.0), true)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	chip.add_child(label)
+	return chip
+
+
+func _make_info_value_row(label_text: String, value_label: Label) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "InfoValueRow"
+	row.add_theme_constant_override("separation", _space(8, 12))
+	var label := _make_label(label_text.to_upper(), _font_px(11, 15, 0.014), Color(0.48, 0.48, 0.62, 1.0), false)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(value_label)
+	return row
+
+
+func _build_car_carousel() -> HBoxContainer:
+	var row := _make_carousel_row(VIEW_CAR_SELECT, false)
+	var cards := row.get_node("CardViewport/CardsList") as HBoxContainer
+	_car_cards_leading_spacer = _make_card_spacer("LeadingCardSpacer")
+	cards.add_child(_car_cards_leading_spacer)
+	for option: Dictionary in _car_options():
+		cards.add_child(_build_car_card(option))
+	_car_cards_trailing_spacer = _make_card_spacer("TrailingCardSpacer")
+	cards.add_child(_car_cards_trailing_spacer)
+	return row
+
+
+func _build_track_carousel() -> HBoxContainer:
+	var row := _make_carousel_row(VIEW_TRACK_SELECT, false)
+	var cards := row.get_node("CardViewport/CardsList") as HBoxContainer
+	_track_cards_leading_spacer = _make_card_spacer("LeadingCardSpacer")
+	cards.add_child(_track_cards_leading_spacer)
+	for option: Dictionary in _track_options():
+		cards.add_child(_build_track_card(option))
+	_track_cards_trailing_spacer = _make_card_spacer("TrailingCardSpacer")
+	cards.add_child(_track_cards_trailing_spacer)
+	return row
+
+
+func _make_carousel_row(card_group: StringName, show_arrows: bool) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "CarouselRow"
+	row.custom_minimum_size = Vector2(1.0, _vh(0.155, 98.0, 138.0))
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", _space(8, 12))
+
+	var previous_button: Button = null
+	if show_arrows:
+		previous_button = _make_arrow_button("<")
+		previous_button.pressed.connect(Callable(self, "_scroll_cards").bind(card_group, -1))
+		row.add_child(previous_button)
+
+	var viewport := ScrollContainer.new()
+	viewport.name = "CardViewport"
+	viewport.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	viewport.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	viewport.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	viewport.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	row.add_child(viewport)
+
+	var cards_list := HBoxContainer.new()
+	cards_list.name = "CardsList"
+	cards_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards_list.alignment = BoxContainer.ALIGNMENT_CENTER
+	cards_list.add_theme_constant_override("separation", _card_gap())
+	viewport.add_child(cards_list)
+
+	var next_button: Button = null
+	if show_arrows:
+		next_button = _make_arrow_button(">")
+		next_button.pressed.connect(Callable(self, "_scroll_cards").bind(card_group, 1))
+		row.add_child(next_button)
+
+	if card_group == VIEW_CAR_SELECT:
+		_car_cards_scroll = viewport
+		_car_prev_button = previous_button
+		_car_next_button = next_button
+	else:
+		_track_cards_scroll = viewport
+		_track_prev_button = previous_button
+		_track_next_button = next_button
+	return row
+
+
+func _make_selection_shell(rows: VBoxContainer) -> HBoxContainer:
+	var shell := HBoxContainer.new()
+	shell.name = "SelectionShell"
+	shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shell.add_theme_constant_override("separation", 0)
+
+	var left_gutter := Control.new()
+	left_gutter.name = "LeftThinColumn"
+	left_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_gutter.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_gutter.size_flags_stretch_ratio = 0.42
+	shell.add_child(left_gutter)
+
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rows.size_flags_stretch_ratio = 12.0
+	shell.add_child(rows)
+
+	var right_gutter := Control.new()
+	right_gutter.name = "RightThinColumn"
+	right_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_gutter.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_gutter.size_flags_stretch_ratio = 0.42
+	shell.add_child(right_gutter)
+	return shell
+
+
+func _make_selection_rows(node_name: String, card_group: StringName) -> VBoxContainer:
+	var rows := VBoxContainer.new()
+	rows.name = node_name
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rows.add_theme_constant_override("separation", _space(10, 18))
+
+	var top_padding := Control.new()
+	top_padding.name = "TopPadding"
+	top_padding.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	top_padding.size_flags_stretch_ratio = 1.0
+	rows.add_child(top_padding)
+
+	var top := Control.new()
+	top.name = "TopContent"
+	top.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	top.size_flags_stretch_ratio = 4.0
+	top.clip_contents = true
+	rows.add_child(top)
+
+	var selection_gap := Control.new()
+	selection_gap.name = "SelectionGap"
+	selection_gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	selection_gap.size_flags_stretch_ratio = 1.0
+	rows.add_child(selection_gap)
+
+	var cards_margin := MarginContainer.new()
+	cards_margin.name = "CardsRowPadding"
+	cards_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards_margin.size_flags_stretch_ratio = 2.0
+	cards_margin.add_theme_constant_override("margin_bottom", _space(8, 14))
+
+	var cards := HBoxContainer.new()
+	cards.name = "CardsRow"
+	cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards.add_theme_constant_override("separation", _space(10, 16))
+
+	var previous_button := _make_arrow_button("<")
+	previous_button.pressed.connect(Callable(self, "_scroll_cards").bind(card_group, -1))
+	cards.add_child(previous_button)
+
+	var viewport := ScrollContainer.new()
+	viewport.name = "CardViewport"
+	viewport.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	viewport.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	viewport.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	viewport.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	cards.add_child(viewport)
+
+	var cards_list := HBoxContainer.new()
+	cards_list.name = "CardsList"
+	cards_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards_list.alignment = BoxContainer.ALIGNMENT_CENTER
+	cards_list.add_theme_constant_override("separation", _card_gap())
+	viewport.add_child(cards_list)
+
+	var next_button := _make_arrow_button(">")
+	next_button.pressed.connect(Callable(self, "_scroll_cards").bind(card_group, 1))
+	cards.add_child(next_button)
+
+	if card_group == VIEW_CAR_SELECT:
+		_car_cards_scroll = viewport
+		_car_prev_button = previous_button
+		_car_next_button = next_button
+	else:
+		_track_cards_scroll = viewport
+		_track_prev_button = previous_button
+		_track_next_button = next_button
+	cards_margin.add_child(cards)
+	rows.add_child(cards_margin)
+
+	var bottom := CenterContainer.new()
+	bottom.name = "BottomActions"
+	bottom.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	bottom.size_flags_stretch_ratio = 2.0
+	rows.add_child(bottom)
+	return rows
+
+
+func _add_top_column(top: Control, column: Control, index: int) -> void:
+	var slot := Control.new()
+	slot.name = "%sSlot" % column.name
+	var column_count := 3.0
+	var gap := float(_space(12, 22))
+	slot.anchor_left = float(index) / column_count
+	slot.anchor_right = float(index + 1) / column_count
+	slot.anchor_top = 0.0
+	slot.anchor_bottom = 1.0
+	slot.offset_left = gap * float(index) / column_count
+	slot.offset_right = -gap * float(int(column_count) - 1 - index) / column_count
+	slot.offset_top = 0.0
+	slot.offset_bottom = 0.0
+	slot.clip_contents = true
+	slot.custom_minimum_size = Vector2.ZERO
+	top.add_child(slot)
+
+	column.anchor_left = 0.0
+	column.anchor_right = 1.0
+	column.anchor_top = 0.0
+	column.anchor_bottom = 1.0
+	column.offset_left = 0.0
+	column.offset_right = 0.0
+	column.offset_top = 0.0
+	column.offset_bottom = 0.0
+	column.clip_contents = true
+	column.custom_minimum_size = Vector2.ZERO
+	slot.add_child(column)
+
+
+func _build_car_details_column() -> VBoxContainer:
+	var column := _make_equal_top_column("CarDetails")
+	_car_name_label = _make_label("", _font_px(34, 58, 0.052), Color(0.96, 0.97, 0.93, 1.0), true)
+	_car_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_configure_top_title_label(_car_name_label)
+	column.add_child(_car_name_label)
+	_car_class_label = _make_label("", _font_px(16, 22, 0.020), Color(0.46, 0.84, 1.0, 1.0), false)
+	_car_class_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_car_class_label)
+	_car_description_label = _make_label("", _font_px(15, 20, 0.018), Color(0.76, 0.80, 0.82, 1.0), false)
+	_car_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_car_description_label)
+	var swatches := GridContainer.new()
+	swatches.name = "SkinSwatches"
+	swatches.columns = 2
+	swatches.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	swatches.add_theme_constant_override("h_separation", _space(8, 14))
+	swatches.add_theme_constant_override("v_separation", _space(8, 14))
+	column.add_child(swatches)
+	for skin: Dictionary in _skin_options_for_selected_car():
+		var button := _make_skin_button(skin)
+		_skin_buttons[StringName(skin.get("id", &""))] = button
+		swatches.add_child(button)
+	return column
+
+
+func _build_car_preview_column() -> PanelContainer:
+	var panel := _make_panel("CarPreviewColumn")
+	panel.size_flags_stretch_ratio = 1.0
+	var preview := SubViewportContainer.new()
+	preview.name = "CarPreview"
+	preview.stretch = true
+	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview.gui_input.connect(Callable(self, "_on_preview_gui_input"))
+	panel.add_child(preview)
+
+	_preview_subviewport = SubViewport.new()
+	_preview_subviewport.name = "PreviewViewport"
+	_preview_subviewport.disable_3d = false
+	_preview_subviewport.transparent_bg = false
+	_preview_subviewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	preview.add_child(_preview_subviewport)
+
+	var root3d := Node3D.new()
+	root3d.name = "StageRoot"
+	_preview_subviewport.add_child(root3d)
+	var showroom_loaded := _load_editable_garage_showroom(root3d)
+	if not showroom_loaded:
+		_build_generated_preview_stage(root3d)
+	_ensure_preview_stage_contract(root3d, not showroom_loaded, not showroom_loaded)
+	_rebuild_car_preview()
+	return panel
+
+
+func _build_car_stats_column() -> VBoxContainer:
+	var column := _make_equal_top_column("CarStats")
+	column.add_child(_make_label("PERFORMANCE", _font_px(15, 20, 0.018), Color(0.46, 0.84, 1.0, 1.0), true))
+	var stats: Dictionary = _displayed_car_option().get("stats", {})
+	for stat_name: String in STAT_ORDER:
+		var row := _make_stat_row(STAT_LABELS.get(stat_name, stat_name), int(stats.get(stat_name, 0)), STAT_COLORS.get(stat_name, Color.WHITE))
+		_car_stat_labels[stat_name] = row.get_child(0)
+		_car_stat_bars[stat_name] = row.get_child(1)
+		column.add_child(row)
+	return column
+
+
+func _build_preview_world_environment(root3d: Node3D) -> void:
+	var world_environment := WorldEnvironment.new()
+	world_environment.name = "PreviewHangarWorldEnvironment"
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color(0.006, 0.008, 0.012, 1.0)
+	environment.background_energy_multiplier = 0.65
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(0.62, 0.70, 0.78, 1.0)
+	environment.ambient_light_energy = 0.46
+	environment.set("reflected_light_source", 1)
+	environment.set("tonemap_mode", 4)
+	environment.tonemap_exposure = 1.056
+	environment.tonemap_white = 6.0
+	environment.set("tonemap_agx_contrast", 1.126)
+	environment.set("tonemap_agx_white", 12.0)
+	environment.ssr_enabled = false
+	environment.ssr_max_steps = 96
+	environment.ssr_fade_in = 0.08
+	environment.ssr_fade_out = 2.8
+	environment.ssr_depth_tolerance = 0.25
+	environment.ssao_enabled = true
+	environment.ssao_radius = 2.2
+	environment.ssao_intensity = 0.826
+	environment.ssao_power = 1.245
+	environment.ssao_detail = 0.455
+	environment.ssil_enabled = true
+	environment.ssil_radius = 3.0
+	environment.ssil_intensity = 0.266
+	environment.glow_enabled = true
+	environment.glow_intensity = 0.196
+	environment.glow_strength = 0.504
+	environment.glow_bloom = 0.056
+	environment.adjustment_enabled = true
+	environment.adjustment_brightness = 1.014
+	environment.adjustment_contrast = 1.049
+	environment.adjustment_saturation = 0.972
+	world_environment.environment = environment
+	root3d.add_child(world_environment)
+
+
+func _load_editable_garage_showroom(root3d: Node3D) -> bool:
+	var packed := load(GARAGE_SHOWROOM_SCENE_PATH) as PackedScene
+	if packed == null:
+		return false
+	var showroom := packed.instantiate()
+	if showroom == null:
+		return false
+	showroom.name = "EditableGarageShowroom"
+	root3d.add_child(showroom)
+	_preview_turntable = _find_node3d_by_name(showroom, &"Turntable")
+	_preview_car_mount = _find_node3d_by_name(showroom, &"CarMount")
+	_preview_camera = _find_camera3d_by_name(showroom, &"PreviewCamera")
+	return _preview_turntable != null
+
+
+func _build_generated_preview_stage(root3d: Node3D) -> void:
+	_build_preview_world_environment(root3d)
+	var light := DirectionalLight3D.new()
+	light.name = "KeyLight"
+	light.light_energy = 1.7
+	light.light_color = Color(1.0, 0.96, 0.88, 1.0)
+	light.shadow_enabled = true
+	light.rotation_degrees = Vector3(-54.0, -32.0, 0.0)
+	root3d.add_child(light)
+	var fill := OmniLight3D.new()
+	fill.name = "FillLight"
+	fill.light_energy = 1.8
+	fill.light_color = Color(0.78, 0.88, 1.0, 1.0)
+	fill.omni_range = 7.5
+	fill.position = Vector3(2.8, 2.4, 3.3)
+	root3d.add_child(fill)
+	var front_reflector := OmniLight3D.new()
+	front_reflector.name = "FrontReflector"
+	front_reflector.light_energy = 1.1
+	front_reflector.light_color = Color(1.0, 0.95, 0.86, 1.0)
+	front_reflector.omni_range = 5.0
+	front_reflector.position = Vector3(-2.8, 1.6, 2.8)
+	root3d.add_child(front_reflector)
+	_build_preview_room(root3d)
+	_build_hangar_ceiling_lights(root3d)
+	_build_preview_beauty_lighting(root3d)
+	_preview_turntable = Node3D.new()
+	_preview_turntable.name = "Turntable"
+	root3d.add_child(_preview_turntable)
+	_build_preview_platform(_preview_turntable)
+
+
+func _ensure_preview_stage_contract(root3d: Node3D, position_camera: bool, allow_platform_fallback: bool) -> void:
+	if _preview_turntable == null:
+		_preview_turntable = Node3D.new()
+		_preview_turntable.name = "Turntable"
+		root3d.add_child(_preview_turntable)
+	if allow_platform_fallback:
+		_build_missing_preview_platform()
+	_preview_turntable.rotation_degrees.y = _preview_turntable_yaw_degrees
+	if _preview_car_mount == null:
+		_preview_car_mount = Node3D.new()
+		_preview_car_mount.name = "CarMount"
+		var mount_y := 0.14
+		if _preview_turntable.get_node_or_null("RotationPlatformModel") != null:
+			mount_y = GARAGE_PLATFORM_TOP_Y
+		_preview_car_mount.position = Vector3(0.0, mount_y, 0.0)
+		_preview_turntable.add_child(_preview_car_mount)
+	if _preview_camera == null:
+		_preview_camera = Camera3D.new()
+		_preview_camera.name = "PreviewCamera"
+		_preview_camera.fov = 42.0
+		root3d.add_child(_preview_camera)
+		position_camera = true
+	_preview_camera.current = true
+	if position_camera:
+		_position_preview_camera()
+
+
+func _build_missing_preview_platform() -> void:
+	if _preview_turntable == null:
+		return
+	if _preview_turntable.get_node_or_null("RotationPlatformModel") != null:
+		return
+	if _preview_turntable.get_node_or_null("RotatingRoundPlatform") != null:
+		return
+	_build_preview_platform(_preview_turntable)
+
+
+func _find_node3d_by_name(root: Node, node_name: StringName) -> Node3D:
+	if root is Node3D and StringName(root.name) == node_name:
+		return root as Node3D
+	for child: Node in root.get_children():
+		var match := _find_node3d_by_name(child, node_name)
+		if match != null:
+			return match
+	return null
+
+
+func _find_camera3d_by_name(root: Node, node_name: StringName) -> Camera3D:
+	if root is Camera3D and StringName(root.name) == node_name:
+		return root as Camera3D
+	for child: Node in root.get_children():
+		var match := _find_camera3d_by_name(child, node_name)
+		if match != null:
+			return match
+	return null
+
+
+func _build_preview_room(root3d: Node3D) -> void:
+	var floor_material := _make_preview_material(Color(0.72, 0.73, 0.71, 1.0), 0.0, 0.32, HANGAR_FLOOR_TEXTURE_PATH, Vector3(2.2, 1.0, 2.0), Color.TRANSPARENT, 0.0, HANGAR_FLOOR_NORMAL_TEXTURE_PATH, 0.20)
+	var wall_material := _make_preview_material(Color(0.76, 0.79, 0.79, 1.0), 0.0, 0.60, HANGAR_WALL_PANEL_TEXTURE_PATH, Vector3(1.0, 1.0, 1.0), Color.TRANSPARENT, 0.0, HANGAR_WALL_NORMAL_TEXTURE_PATH, 0.24)
+	var side_wall_material := _make_preview_material(Color(0.64, 0.68, 0.69, 1.0), 0.0, 0.62, HANGAR_WALL_PANEL_TEXTURE_PATH, Vector3(1.0, 1.0, 1.0), Color.TRANSPARENT, 0.0, HANGAR_WALL_NORMAL_TEXTURE_PATH, 0.22)
+	var ceiling_material := _make_preview_material(Color(0.36, 0.38, 0.40, 1.0), 0.10, 0.46, HANGAR_CEILING_TEXTURE_PATH, Vector3(1.9, 1.0, 1.6), Color.TRANSPARENT, 0.0, HANGAR_CEILING_NORMAL_TEXTURE_PATH, 0.32)
+	var beam_material := _make_preview_material(Color(0.055, 0.060, 0.065, 1.0), 0.38, 0.36)
+	var trim_material := _make_preview_material(Color(0.13, 0.15, 0.16, 1.0), 0.26, 0.40)
+	var window_material := _make_preview_material(Color(0.58, 0.88, 1.0, 0.88), 0.0, 0.12, "", Vector3.ONE, Color(0.40, 0.86, 1.0, 1.0), 0.85)
+
+	_add_preview_box(root3d, "HangarPolishedFloor", Vector3(11.0, 0.08, 9.0), Vector3(0.0, -0.08, 0.0), floor_material)
+	_add_preview_box(root3d, "HangarBackWall", Vector3(11.0, 3.45, 0.12), Vector3(0.0, 1.62, -4.30), wall_material)
+	_add_preview_box(root3d, "HangarLeftWall", Vector3(0.12, 3.35, 9.0), Vector3(-5.42, 1.55, 0.0), side_wall_material)
+	_add_preview_box(root3d, "HangarRightWall", Vector3(0.12, 3.35, 9.0), Vector3(5.42, 1.55, 0.0), side_wall_material)
+	_add_preview_box(root3d, "HangarCeiling", Vector3(11.0, 0.10, 9.0), Vector3(0.0, 3.34, 0.0), ceiling_material)
+
+	for index: int in range(7):
+		var x := -4.8 + float(index) * 1.6
+		_add_preview_box(root3d, "HangarBackVerticalBeam_%02d" % index, Vector3(0.055, 3.25, 0.08), Vector3(x, 1.55, -4.20), beam_material)
+	for beam_y: float in [0.52, 1.62, 2.74]:
+		_add_preview_box(root3d, "HangarBackHorizontalBeam_%.1f" % beam_y, Vector3(10.65, 0.045, 0.08), Vector3(0.0, beam_y, -4.18), beam_material)
+	for index: int in range(5):
+		var z := -3.45 + float(index) * 1.72
+		_add_preview_box(root3d, "HangarLeftBayBeam_%02d" % index, Vector3(0.08, 3.05, 0.055), Vector3(-5.32, 1.45, z), trim_material)
+		_add_preview_box(root3d, "HangarRightBayBeam_%02d" % index, Vector3(0.08, 3.05, 0.055), Vector3(5.32, 1.45, z), trim_material)
+		_add_preview_box(root3d, "HangarRoofRib_%02d" % index, Vector3(10.75, 0.08, 0.075), Vector3(0.0, 3.22, z), beam_material)
+
+	for index: int in range(5):
+		var window_x := -3.55 + float(index) * 1.78
+		_add_preview_box(root3d, "HangarUpperWindow_%02d" % index, Vector3(1.18, 0.38, 0.035), Vector3(window_x, 2.34, -4.13), window_material)
+
+	_add_preview_box(root3d, "HangarLeftWindowStrip", Vector3(0.035, 0.32, 4.2), Vector3(-5.25, 2.28, -1.0), window_material)
+	_add_preview_box(root3d, "HangarRightWindowStrip", Vector3(0.035, 0.32, 4.2), Vector3(5.25, 2.28, -1.0), window_material)
+	_add_preview_box(root3d, "HangarBackLowerKickPlate", Vector3(10.7, 0.36, 0.055), Vector3(0.0, 0.18, -4.12), trim_material)
+	_add_preview_box(root3d, "HangarLeftLowerKickPlate", Vector3(0.055, 0.34, 8.6), Vector3(-5.25, 0.17, 0.0), trim_material)
+	_add_preview_box(root3d, "HangarRightLowerKickPlate", Vector3(0.055, 0.34, 8.6), Vector3(5.25, 0.17, 0.0), trim_material)
+
+
+func _build_hangar_ceiling_lights(root3d: Node3D) -> void:
+	var panel_material := _make_preview_material(Color(1.0, 0.96, 0.84, 1.0), 0.0, 0.32, "", Vector3.ONE, Color(1.0, 0.93, 0.72, 1.0), 0.9)
+	for row: int in range(3):
+		var z := -2.45 + float(row) * 2.35
+		for column: int in range(3):
+			var x := -2.75 + float(column) * 2.75
+			_add_preview_box(root3d, "HangarLightPanel_%02d_%02d" % [row, column], Vector3(1.25, 0.035, 0.42), Vector3(x, 3.16, z), panel_material)
+			var light := OmniLight3D.new()
+			light.name = "HangarSoftLight_%02d_%02d" % [row, column]
+			light.light_energy = 0.68
+			light.light_color = Color(1.0, 0.96, 0.86, 1.0)
+			light.omni_range = 4.6
+			light.position = Vector3(x, 2.94, z)
+			root3d.add_child(light)
+
+
+func _build_preview_beauty_lighting(root3d: Node3D) -> void:
+	var beauty := Node3D.new()
+	beauty.name = "EditableBeautyLighting"
+	root3d.add_child(beauty)
+
+	var probe := ReflectionProbe.new()
+	probe.name = "ShowroomReflectionProbe"
+	probe.position = Vector3(-0.45, 1.35, -0.35)
+	probe.size = Vector3(13.5, 5.2, 15.5)
+	probe.origin_offset = Vector3(0.0, 0.15, 0.0)
+	probe.box_projection = true
+	probe.interior = true
+	probe.intensity = 0.128
+	probe.blend_distance = 1.15
+	beauty.add_child(probe)
+
+	var cool_softbox := _make_preview_material(Color(0.93, 0.965, 1.0, 1.0), 0.0, 0.05, "", Vector3.ONE, Color(0.78, 0.90, 1.0, 1.0), 2.6)
+	var warm_softbox := _make_preview_material(Color(1.0, 0.955, 0.84, 1.0), 0.0, 0.06, "", Vector3.ONE, Color(1.0, 0.86, 0.62, 1.0), 1.65)
+	_add_hidden_preview_beauty_box(beauty, "BeautySoftbox_Ceiling_Left", Vector3(3.1, 0.035, 0.48), Vector3(-1.95, 3.24, 0.65), cool_softbox)
+	_add_hidden_preview_beauty_box(beauty, "BeautySoftbox_Ceiling_Right", Vector3(3.1, 0.035, 0.48), Vector3(1.65, 3.24, 0.65), cool_softbox)
+	_add_hidden_preview_beauty_box(beauty, "BeautySoftbox_Back_Warm", Vector3(3.1, 0.035, 0.48), Vector3(-0.25, 2.34, -4.04), warm_softbox, Vector3(40.0, 0.0, 0.0))
+	_add_hidden_preview_beauty_box(beauty, "BeautySoftbox_Left_Rim", Vector3(0.045, 1.45, 3.15), Vector3(-5.18, 1.65, 0.7), cool_softbox)
+	_add_hidden_preview_beauty_box(beauty, "BeautySoftbox_Right_Rim", Vector3(0.045, 1.45, 3.15), Vector3(5.18, 1.65, 0.7), cool_softbox)
+
+	_add_preview_beauty_spot(beauty, "BeautyOverheadSpot_Left", Vector3(-1.95, 3.02, 0.65), Color(0.88, 0.95, 1.0, 1.0), 1.505, 1.25)
+	_add_preview_beauty_spot(beauty, "BeautyOverheadSpot_Right", Vector3(1.65, 3.02, 0.65), Color(0.88, 0.95, 1.0, 1.0), 1.4, 1.2)
+	_add_preview_beauty_omni(beauty, "BeautyLeftCoolRim", Vector3(-4.45, 1.55, 1.7), Color(0.55, 0.82, 1.0, 1.0), 0.875, 4.6)
+	_add_preview_beauty_omni(beauty, "BeautyRightCoolRim", Vector3(4.45, 1.55, 1.7), Color(0.55, 0.82, 1.0, 1.0), 0.665, 4.6)
+	_add_preview_beauty_omni(beauty, "BeautyFrontWarmKicker", Vector3(-2.8, 0.95, 3.05), Color(1.0, 0.80, 0.56, 1.0), 0.504, 3.8)
+
+
+func _add_hidden_preview_beauty_box(parent: Node3D, node_name: String, box_size: Vector3, box_position: Vector3, box_material: Material, box_rotation_degrees: Vector3 = Vector3.ZERO) -> MeshInstance3D:
+	var node := _add_preview_box(parent, node_name, box_size, box_position, box_material, box_rotation_degrees)
+	node.visible = false
+	return node
+
+
+func _add_preview_beauty_spot(parent: Node3D, node_name: String, light_position: Vector3, color: Color, energy: float, size: float) -> void:
+	var light := SpotLight3D.new()
+	light.name = node_name
+	light.position = light_position
+	light.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+	light.light_color = color
+	light.light_energy = energy
+	light.light_size = size
+	light.shadow_enabled = true
+	light.shadow_blur = 2.0
+	light.spot_range = 7.0
+	light.spot_angle = 58.0
+	light.spot_attenuation = 1.1
+	parent.add_child(light)
+
+
+func _add_preview_beauty_omni(parent: Node3D, node_name: String, light_position: Vector3, color: Color, energy: float, light_range: float) -> void:
+	var light := OmniLight3D.new()
+	light.name = node_name
+	light.position = light_position
+	light.light_color = color
+	light.light_energy = energy
+	light.light_size = 0.9
+	light.omni_range = light_range
+	parent.add_child(light)
+
+
+func _add_preview_box(parent: Node3D, node_name: String, box_size: Vector3, box_position: Vector3, box_material: Material, box_rotation_degrees: Vector3 = Vector3.ZERO) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	node.name = node_name
+	var mesh := BoxMesh.new()
+	mesh.size = box_size
+	node.mesh = mesh
+	node.position = box_position
+	node.rotation_degrees = box_rotation_degrees
+	node.material_override = box_material
+	parent.add_child(node)
+	return node
+
+
+func _build_preview_platform(parent: Node3D) -> void:
+	var platform_scene := load(GARAGE_PLATFORM_MODEL_PATH) as PackedScene
+	if platform_scene != null:
+		var platform_model := platform_scene.instantiate() as Node3D
+		if platform_model != null:
+			platform_model.name = "RotationPlatformModel"
+			platform_model.scale = Vector3.ONE * GARAGE_PLATFORM_SCALE
+			platform_model.position = GARAGE_PLATFORM_POSITION
+			parent.add_child(platform_model)
+			return
+
+	var base := MeshInstance3D.new()
+	base.name = "RotatingRoundPlatform"
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 2.55
+	mesh.bottom_radius = 2.65
+	mesh.height = 0.24
+	mesh.radial_segments = 64
+	base.mesh = mesh
+	base.position = Vector3(0.0, 0.02, 0.0)
+	base.material_override = _make_preview_material(Color(0.11, 0.12, 0.13, 1.0), 0.5, 0.24)
+	parent.add_child(base)
+
+	var highlight := MeshInstance3D.new()
+	highlight.name = "PlatformTopHighlight"
+	var highlight_mesh := CylinderMesh.new()
+	highlight_mesh.top_radius = 2.40
+	highlight_mesh.bottom_radius = 2.40
+	highlight_mesh.height = 0.025
+	highlight_mesh.radial_segments = 64
+	highlight.mesh = highlight_mesh
+	highlight.position = Vector3(0.0, 0.155, 0.0)
+	highlight.material_override = _make_preview_material(Color(0.19, 0.22, 0.25, 1.0), 0.35, 0.28)
+	parent.add_child(highlight)
+
+
+func _make_preview_material(color: Color, metallic: float, roughness: float, texture_path: String = "", uv_scale: Vector3 = Vector3.ONE, emission_color: Color = Color.TRANSPARENT, emission_energy: float = 0.0, normal_texture_path: String = "", normal_scale: float = 0.25) -> StandardMaterial3D:
+	var preview_material := StandardMaterial3D.new()
+	preview_material.albedo_color = color
+	preview_material.metallic = metallic
+	preview_material.roughness = roughness
+	preview_material.set("uv1_scale", uv_scale)
+	if not texture_path.is_empty():
+		var texture := _load_texture_safely(texture_path)
+		if texture != null:
+			preview_material.albedo_texture = texture
+			preview_material.set("texture_repeat", 1)
+	if not normal_texture_path.is_empty():
+		var normal_texture := _load_texture_safely(normal_texture_path)
+		if normal_texture != null:
+			preview_material.set("normal_enabled", true)
+			preview_material.set("normal_scale", normal_scale)
+			preview_material.set("normal_texture", normal_texture)
+	if emission_energy > 0.0:
+		preview_material.set("emission_enabled", true)
+		preview_material.set("emission", emission_color)
+		preview_material.set("emission_energy_multiplier", emission_energy)
+	return preview_material
+
+
+func _build_car_card(option: Dictionary) -> Button:
+	var car_id := StringName(option.get("id", &""))
+	var card := _make_card_button("CarCard")
+	card.tooltip_text = str(option.get("display_name", "Car"))
+	card.pressed.connect(Callable(self, "_select_car").bind(car_id))
+	_car_buttons[car_id] = card
+	var image := _card_image(card)
+	image.texture = _load_car_card_texture(option)
+	return card
+
+
+func _build_track_title_column() -> VBoxContainer:
+	var column := _make_equal_top_column("TrackTitle")
+	_track_name_label = _make_label("", _font_px(34, 58, 0.052), Color(0.96, 0.97, 0.93, 1.0), true)
+	_track_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_configure_top_title_label(_track_name_label)
+	column.add_child(_track_name_label)
+	_track_meta_label = _make_label("", _font_px(16, 22, 0.020), Color(0.46, 0.84, 1.0, 1.0), false)
+	_track_meta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_track_meta_label)
+	column.add_child(_make_label("TRACK SELECT", _font_px(15, 20, 0.018), Color(0.76, 0.80, 0.82, 1.0), true))
+	return column
+
+
+func _build_track_preview_column() -> PanelContainer:
+	var panel := _make_panel("TrackPreviewColumn")
+	var texture := TextureRect.new()
+	texture.name = "TrackPreview"
+	texture.texture = _load_track_preview_texture(_displayed_track_option())
+	texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	texture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texture.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_track_preview_texture_rect = texture
+	panel.add_child(texture)
+	return panel
+
+
+func _build_track_description_column() -> VBoxContainer:
+	var column := _make_equal_top_column("TrackDetails")
+	column.add_child(_make_label("ROUTE BRIEF", _font_px(15, 20, 0.018), COLOR_RACING_BLUE, true))
+	_track_description_label = _make_label("", _font_px(16, 22, 0.020), Color(0.82, 0.85, 0.86, 1.0), false)
+	_track_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_track_description_label)
+	var difficulty_gap := Control.new()
+	difficulty_gap.custom_minimum_size = Vector2(1.0, _space(8, 18))
+	column.add_child(difficulty_gap)
+	column.add_child(_make_label("RIVAL DIFFICULTY", _font_px(15, 20, 0.018), COLOR_RACING_BLUE, true))
+	var difficulty_row := HBoxContainer.new()
+	difficulty_row.name = "DifficultyRow"
+	difficulty_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	difficulty_row.add_theme_constant_override("separation", _space(8, 12))
+	column.add_child(difficulty_row)
+	for difficulty: Dictionary in _difficulty_options():
+		var button := _make_difficulty_button(difficulty)
+		_difficulty_buttons[StringName(difficulty.get("id", &""))] = button
+		difficulty_row.add_child(button)
+	_difficulty_description_label = _make_label("", _font_px(14, 19, 0.017), COLOR_TEXT_MUTED, false)
+	_difficulty_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_difficulty_description_label)
+	return column
+
+
+func _build_track_card(option: Dictionary) -> Button:
+	var track_id := StringName(option.get("id", &""))
+	var card := _make_card_button("TrackCard")
+	var can_start := _track_can_start(option)
+	card.tooltip_text = str(option.get("display_name", "Track"))
+	if not can_start:
+		card.tooltip_text = str(option.get("locked_reason", option.get("unavailable_reason", "Track locked")))
+	card.pressed.connect(Callable(self, "_select_track").bind(track_id))
+	_track_buttons[track_id] = card
+	var image := _card_image(card)
+	image.texture = _load_track_preview_texture(option)
+	if not can_start:
+		_add_locked_track_card_overlay(card)
+	return card
+
+
+func _make_safe_area() -> MarginContainer:
+	var safe := MarginContainer.new()
+	safe.name = "SafeArea"
+	safe.set_anchors_preset(Control.PRESET_FULL_RECT)
+	safe.add_theme_constant_override("margin_left", _space(36, 70))
+	safe.add_theme_constant_override("margin_top", _space(84, 112))
+	safe.add_theme_constant_override("margin_right", _space(36, 70))
+	safe.add_theme_constant_override("margin_bottom", _space(24, 44))
+	return safe
+
+
+func _make_logo_top_bar() -> PanelContainer:
+	var bar := PanelContainer.new()
+	bar.name = "TopStatusBar"
+	bar.anchor_left = 0.0
+	bar.anchor_top = 0.0
+	bar.anchor_right = 1.0
+	bar.anchor_bottom = 0.0
+	bar.offset_bottom = _vh(0.085, 66.0, 92.0)
+	bar.add_theme_stylebox_override("panel", _make_panel_style(Color(0.010, 0.012, 0.016, 0.60), Color(1.0, 1.0, 1.0, 0.08), 1, 0))
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", _space(32, 56))
+	margin.add_theme_constant_override("margin_right", _space(32, 56))
+	margin.add_theme_constant_override("margin_top", _space(8, 14))
+	margin.add_theme_constant_override("margin_bottom", _space(8, 14))
+	bar.add_child(margin)
+
+	var center := CenterContainer.new()
+	center.name = "TopBarLogoCenter"
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(center)
+
+	var brand := _make_label("SUMMER RACER", _font_px(24, 40, 0.036), COLOR_TEXT_MAIN, true)
+	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	brand.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	center.add_child(brand)
+	return bar
+
+
+func _make_top_bar_badge(text: String, fill: Color, border: Color) -> PanelContainer:
+	var badge := PanelContainer.new()
+	badge.name = "TopBarBadge"
+	badge.custom_minimum_size = Vector2(_space(72, 128), 1.0)
+	badge.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	badge.add_theme_stylebox_override("panel", _make_panel_style(fill, border, 1, 5))
+	var label := _make_label(text, _font_px(12, 17, 0.016), COLOR_TEXT_MAIN, true)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.add_child(label)
+	return badge
+
+
+func _make_top_bar_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(_space(86, 136), 1.0)
+	button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", _font_px(12, 17, 0.016))
+	button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.045, 0.050, 0.062, 0.80), Color(1.0, 1.0, 1.0, 0.22), 1, 5))
+	button.add_theme_stylebox_override("hover", _make_panel_style(Color(0.10, 0.11, 0.13, 0.92), COLOR_RACING_BLUE, 1, 5))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(Color(0.16, 0.035, 0.045, 0.96), COLOR_RACING_RED_HOVER, 1, 5))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, COLOR_RACING_BLUE, 2, 5))
+	button.add_theme_color_override("font_color", COLOR_TEXT_MAIN)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	return button
+
+
+func _make_equal_top_column(node_name: String) -> VBoxContainer:
+	var column := VBoxContainer.new()
+	column.name = node_name
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.size_flags_stretch_ratio = 1.0
+	column.custom_minimum_size = Vector2.ZERO
+	column.clip_contents = true
+	column.add_theme_constant_override("separation", _space(8, 14))
+	return column
+
+
+func _make_panel(node_name: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = node_name
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 1.0
+	panel.custom_minimum_size = Vector2.ZERO
+	panel.clip_contents = true
+	panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.035, 0.042, 0.054, 0.78), Color(1.0, 1.0, 1.0, 0.12), 1, 8))
+	return panel
+
+
+func _make_card_button(node_name: String) -> Button:
+	var button := Button.new()
+	button.name = node_name
+	button.text = ""
+	button.toggle_mode = true
+	button.custom_minimum_size = Vector2(_selection_card_width(), _selection_card_height())
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	button.clip_contents = true
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_apply_choice_card_style(button)
+	return button
+
+
+func _make_arrow_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(_space(68, 92), 1.0)
+	button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", _font_px(34, 52, 0.046))
+	_apply_arrow_button_style(button)
+	return button
+
+
+func _make_card_spacer(node_name: String) -> Control:
+	var spacer := Control.new()
+	spacer.name = node_name
+	spacer.custom_minimum_size = Vector2(1.0, 1.0)
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	return spacer
+
+
+func _make_bottom_action_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "BottomActionRow"
+	row.custom_minimum_size = Vector2(_vw(0.34, 360.0, 660.0), 0.0)
+	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_theme_constant_override("separation", _space(12, 22))
+	return row
+
+
+func _card_content(card: Button) -> VBoxContainer:
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", _space(8, 14))
+	margin.add_theme_constant_override("margin_top", _space(8, 14))
+	margin.add_theme_constant_override("margin_right", _space(8, 14))
+	margin.add_theme_constant_override("margin_bottom", _space(8, 14))
+	card.add_child(margin)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", _space(5, 8))
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(content)
+	return content
+
+
+func _card_image(card: Button) -> TextureRect:
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", _space(5, 8))
+	margin.add_theme_constant_override("margin_top", _space(5, 8))
+	margin.add_theme_constant_override("margin_right", _space(5, 8))
+	margin.add_theme_constant_override("margin_bottom", _space(5, 8))
+	card.add_child(margin)
+
+	var image := TextureRect.new()
+	image.name = "PreviewImage"
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	image.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	image.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(image)
+	return image
+
+
+func _add_locked_track_card_overlay(card: Button) -> void:
+	var overlay := ColorRect.new()
+	overlay.name = "LockedOverlay"
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.color = Color(0.02, 0.022, 0.026, 0.58)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card.add_child(overlay)
+
+	var label_shell := CenterContainer.new()
+	label_shell.name = "LockedLabelShell"
+	label_shell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label_shell.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card.add_child(label_shell)
+
+	var label := _make_label("LOCKED", _font_px(13, 18, 0.017), Color(0.78, 0.78, 0.74, 1.0), true)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label_shell.add_child(label)
+
+
+func _make_skin_button(skin: Dictionary) -> Button:
+	var button := Button.new()
+	button.toggle_mode = true
+	button.text = ""
+	button.tooltip_text = str(skin.get("display_name", "Skin"))
+	button.custom_minimum_size = Vector2(1.0, _vh(0.055, 46.0, 68.0))
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", _font_px(13, 18, 0.016))
+	var swatch := _safe_color(skin.get("swatch", Color.WHITE))
+	button.add_theme_stylebox_override("normal", _make_panel_style(swatch.darkened(0.28), swatch, 1, 8))
+	button.add_theme_stylebox_override("hover", _make_panel_style(swatch.darkened(0.12), Color.WHITE, 1, 8))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(swatch.darkened(0.38), Color.WHITE, 2, 8))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, Color.WHITE, 2, 8))
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.pressed.connect(Callable(self, "_select_skin").bind(StringName(skin.get("id", &""))))
+	return button
+
+
+func _make_difficulty_button(difficulty: Dictionary) -> Button:
+	var difficulty_id := StringName(difficulty.get("id", &""))
+	var button := Button.new()
+	button.name = "DifficultyButton"
+	button.toggle_mode = true
+	button.text = str(difficulty.get("display_name", difficulty_id)).to_upper()
+	button.tooltip_text = str(difficulty.get("description", ""))
+	button.set_meta("difficulty_id", difficulty_id)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.custom_minimum_size = Vector2(1.0, _vh(0.050, 42.0, 62.0))
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", _font_px(12, 17, 0.016))
+	_apply_difficulty_button_style(button, false)
+	button.pressed.connect(Callable(self, "_select_difficulty").bind(difficulty_id))
+	return button
+
+
+func _build_gear_mode_toggle() -> VBoxContainer:
+	var root := VBoxContainer.new()
+	root.name = "GearModeToggle"
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", _space(6, 10))
+	root.add_child(_make_section_label("GEAR MODE"))
+
+	var row := HBoxContainer.new()
+	row.name = "GearModeRow"
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", _space(6, 10))
+	root.add_child(row)
+
+	for mode: String in [GEAR_MODE_AUTOMATIC, GEAR_MODE_MANUAL]:
+		var button := _make_gear_mode_button(mode)
+		_gear_mode_buttons[mode] = button
+		row.add_child(button)
+	return root
+
+
+func _make_gear_mode_button(mode: String) -> Button:
+	var button := Button.new()
+	button.name = "GearModeButton"
+	button.toggle_mode = true
+	button.text = "AUTO" if mode == GEAR_MODE_AUTOMATIC else "MANUAL"
+	button.tooltip_text = "Automatic shifting" if mode == GEAR_MODE_AUTOMATIC else "Manual shifting"
+	button.set_meta("gear_mode", mode)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.custom_minimum_size = Vector2(1.0, _vh(0.045, 36.0, 52.0))
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", _font_px(12, 18, 0.016))
+	_apply_gear_mode_button_style(button, mode == _selected_gear_mode)
+	button.pressed.connect(Callable(self, "_select_gear_mode").bind(mode))
+	return button
+
+
+func _make_slider_row(label_text: String, callback: Callable) -> Dictionary:
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", _space(7, 10))
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", _space(8, 12))
+	root.add_child(header)
+	var label := _make_label(label_text.to_upper(), _font_px(11, 15, 0.014), Color(0.76, 0.76, 0.84, 1.0), false)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(label)
+	var value_label := _make_label("100", _font_px(12, 16, 0.015), COLOR_RACING_RED, true)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.custom_minimum_size = Vector2(_space(42, 58), 1.0)
+	header.add_child(value_label)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(1.0, _space(22, 32))
+	slider.add_theme_stylebox_override("slider", _make_panel_style(Color(1.0, 1.0, 1.0, 0.08), Color.TRANSPARENT, 0, 3))
+	slider.add_theme_stylebox_override("grabber_area", _make_panel_style(COLOR_RACING_RED, COLOR_RACING_RED, 0, 3))
+	slider.add_theme_stylebox_override("grabber_area_highlight", _make_panel_style(COLOR_RACING_RED_HOVER, COLOR_RACING_RED_HOVER, 0, 3))
+	slider.value_changed.connect(callback)
+	root.add_child(slider)
+	return {"root": root, "slider": slider, "value_label": value_label}
+
+
+func _make_label(text: String, font_size: int, color: Color, bold: bool) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	if bold:
+		label.add_theme_constant_override("outline_size", 1)
+		label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.32))
+	return label
+
+
+func _configure_top_title_label(label: Label) -> void:
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.max_lines_visible = 2
+
+
+func _make_button(text: String, primary: bool, font_size: int, height: float) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(1.0, height)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.focus_mode = Control.FOCUS_ALL
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", font_size)
+	_apply_button_style(button, primary)
+	return button
+
+
+func _make_stat_row(label_text: String, value: int, accent: Color) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", _space(4, 7))
+	var label := _make_label("%s  %d" % [label_text.to_upper(), value], _font_px(14, 20, 0.018), Color(0.88, 0.90, 0.90, 1.0), false)
+	box.add_child(label)
+	var bar := ProgressBar.new()
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.value = value
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(1.0, _space(8, 12))
+	bar.add_theme_stylebox_override("background", _make_panel_style(Color(0.18, 0.19, 0.21, 1.0), Color.TRANSPARENT, 0, 4))
+	bar.add_theme_stylebox_override("fill", _make_panel_style(accent, accent, 0, 4))
+	box.add_child(bar)
+	return box
+
+
+func _make_compact_stat_row(label_text: String, value: int, accent: Color) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", _space(3, 5))
+	var label := _make_label("%s  %d" % [label_text.to_upper(), value], _font_px(10, 13, 0.012), Color(0.76, 0.77, 0.78, 1.0), false)
+	box.add_child(label)
+	box.add_child(_make_mini_stat_bar(value, accent))
+	return box
+
+
+func _make_mini_stat_bar(value: int, accent: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.value = value
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(1.0, _space(6, 9))
+	bar.add_theme_stylebox_override("background", _make_panel_style(Color(0.16, 0.17, 0.19, 1.0), Color.TRANSPARENT, 0, 3))
+	bar.add_theme_stylebox_override("fill", _make_panel_style(accent, accent, 0, 3))
+	return bar
+
+
+func _apply_choice_card_style(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.035, 0.045, 0.055, 0.90), Color(1.0, 1.0, 1.0, 0.18), 1, 10))
+	button.add_theme_stylebox_override("hover", _make_panel_style(Color(0.070, 0.074, 0.082, 1.0), Color(1.0, 1.0, 1.0, 0.72), 2, 10))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(Color(0.12, 0.12, 0.13, 1.0), Color(1.0, 1.0, 1.0, 0.95), 4, 10))
+	button.add_theme_stylebox_override("hover_pressed", _make_panel_style(Color(0.16, 0.16, 0.17, 1.0), Color(1.0, 1.0, 1.0, 1.0), 4, 10))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, Color(1.0, 1.0, 1.0, 0.84), 2, 10))
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+
+
+func _apply_difficulty_button_style(button: Button, selected: bool) -> void:
+	var difficulty_id := StringName(button.get_meta("difficulty_id", &""))
+	var accent := _difficulty_color_for_id(difficulty_id)
+	var normal_fill := Color(0.045, 0.052, 0.064, 0.88)
+	var normal_border := Color(accent.r, accent.g, accent.b, 0.58)
+	var text_color := COLOR_TEXT_MAIN
+	if selected:
+		normal_fill = accent
+		normal_border = Color(1.0, 1.0, 1.0, 0.84)
+		if difficulty_id == &"medium":
+			text_color = Color(0.04, 0.035, 0.020, 1.0)
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_fill, normal_border, 1 if not selected else 2, 6))
+	button.add_theme_stylebox_override("hover", _make_panel_style(accent.darkened(0.44), Color(accent.r, accent.g, accent.b, 0.94), 2, 6))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(accent.darkened(0.18), Color(1.0, 1.0, 1.0, 0.82), 2, 6))
+	button.add_theme_stylebox_override("hover_pressed", _make_panel_style(accent.darkened(0.10), Color(1.0, 1.0, 1.0, 0.96), 2, 6))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, Color(1.0, 1.0, 1.0, 0.88), 2, 6))
+	button.add_theme_color_override("font_color", text_color)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", text_color)
+
+
+func _apply_gear_mode_button_style(button: Button, selected: bool) -> void:
+	var fill := Color(0.035, 0.040, 0.048, 0.94)
+	var border := Color(1.0, 1.0, 1.0, 0.16)
+	var hover_fill := Color(0.14, 0.14, 0.15, 0.96)
+	var hover_border := Color(1.0, 1.0, 1.0, 0.68)
+	var pressed_fill := Color(0.82, 0.82, 0.78, 1.0)
+	var pressed_border := Color(1.0, 1.0, 1.0, 0.84)
+	var hover_pressed_fill := Color(0.94, 0.94, 0.90, 1.0)
+	var hover_pressed_border := Color(1.0, 1.0, 1.0, 0.94)
+	var font_color := Color(0.74, 0.75, 0.76, 1.0)
+	var hover_font_color := Color.WHITE
+	var pressed_font_color := Color(0.025, 0.026, 0.030, 1.0)
+	var hover_pressed_font_color := Color(0.025, 0.026, 0.030, 1.0)
+	if selected:
+		fill = Color(0.88, 0.88, 0.84, 0.96)
+		border = Color(1.0, 1.0, 1.0, 0.74)
+		hover_fill = Color(0.94, 0.94, 0.90, 1.0)
+		hover_border = Color(1.0, 1.0, 1.0, 0.94)
+		pressed_fill = Color(0.82, 0.82, 0.78, 1.0)
+		pressed_border = Color(1.0, 1.0, 1.0, 0.84)
+		hover_pressed_fill = Color(0.94, 0.94, 0.90, 1.0)
+		hover_pressed_border = Color(1.0, 1.0, 1.0, 0.94)
+		font_color = Color(0.025, 0.026, 0.030, 1.0)
+		hover_font_color = font_color
+		pressed_font_color = font_color
+		hover_pressed_font_color = font_color
+	button.add_theme_stylebox_override("normal", _make_panel_style(fill, border, 1 if not selected else 2, 6))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_fill, hover_border, 2 if selected else 1, 6))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_fill, pressed_border, 2, 6))
+	button.add_theme_stylebox_override("hover_pressed", _make_panel_style(hover_pressed_fill, hover_pressed_border, 2, 6))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, Color(1.0, 1.0, 1.0, 0.82), 2, 6))
+	button.add_theme_color_override("font_color", font_color)
+	button.add_theme_color_override("font_hover_color", hover_font_color)
+	button.add_theme_color_override("font_pressed_color", pressed_font_color)
+	button.add_theme_color_override("font_hover_pressed_color", hover_pressed_font_color)
+
+
+func _apply_button_style(button: Button, primary: bool) -> void:
+	var normal_fill := Color(0.075, 0.088, 0.108, 0.96)
+	var hover_fill := Color(0.11, 0.13, 0.16, 1.0)
+	var pressed_fill := Color(0.15, 0.17, 0.20, 1.0)
+	var border := Color(1.0, 1.0, 1.0, 0.18)
+	var font_color := Color(0.92, 0.94, 0.92, 1.0)
+	var hover_font_color := Color.WHITE
+	var pressed_font_color := Color.WHITE
+	if primary:
+		normal_fill = Color(0.88, 0.88, 0.84, 0.96)
+		hover_fill = Color(1.0, 1.0, 0.96, 1.0)
+		pressed_fill = Color(0.72, 0.72, 0.68, 1.0)
+		border = Color(1.0, 1.0, 1.0, 0.62)
+		font_color = Color(0.025, 0.026, 0.030, 1.0)
+		hover_font_color = font_color
+		pressed_font_color = font_color
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_fill, border, 1, 8))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_fill, Color(1.0, 1.0, 1.0, 0.82), 1, 8))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_fill, Color(1.0, 1.0, 1.0, 0.75), 1, 8))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.14, 0.14, 0.15, 0.72), Color(1.0, 1.0, 1.0, 0.12), 1, 8))
+	var focus_border := Color(1.0, 1.0, 1.0, 0.82)
+	if primary:
+		focus_border = Color(1.0, 1.0, 1.0, 0.62)
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, focus_border, 2, 8))
+	button.add_theme_color_override("font_color", font_color)
+	button.add_theme_color_override("font_hover_color", hover_font_color)
+	button.add_theme_color_override("font_pressed_color", pressed_font_color)
+	button.add_theme_color_override("font_disabled_color", Color(0.54, 0.54, 0.56, 1.0))
+
+
+func _apply_arrow_button_style(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.02, 0.18, 0.27, 0.96), Color(0.46, 0.84, 1.0, 0.72), 2, 8))
+	button.add_theme_stylebox_override("hover", _make_panel_style(Color(0.05, 0.32, 0.45, 1.0), Color(0.80, 0.94, 1.0, 0.96), 2, 8))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(Color(0.01, 0.12, 0.19, 1.0), Color(1.0, 1.0, 1.0, 0.85), 2, 8))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.06, 0.07, 0.08, 0.38), Color(1.0, 1.0, 1.0, 0.08), 1, 8))
+	button.add_theme_stylebox_override("focus", _make_panel_style(Color.TRANSPARENT, Color(0.46, 0.84, 1.0, 0.95), 2, 8))
+	button.add_theme_color_override("font_color", Color(0.92, 0.98, 1.0, 1.0))
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.add_theme_color_override("font_disabled_color", Color(0.72, 0.76, 0.78, 0.62))
+
+
+func _difficulty_color_for_id(difficulty_id: StringName) -> Color:
+	match str(difficulty_id).to_lower():
+		"easy":
+			return Color(0.20, 0.76, 0.38, 1.0)
+		"medium":
+			return Color(0.95, 0.78, 0.18, 1.0)
+		"hard":
+			return Color(0.82, 0.12, 0.14, 1.0)
+	return Color(0.88, 0.88, 0.84, 1.0)
+
+
+func _make_panel_style(fill: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = _space(8, 12)
+	style.content_margin_right = _space(8, 12)
+	style.content_margin_top = _space(6, 10)
+	style.content_margin_bottom = _space(6, 10)
+	return style
+
+
+func _show_view(view_name: StringName, sync: bool = true) -> void:
+	_active_view = view_name
+	if _home_view != null:
+		_home_view.visible = view_name == VIEW_HOME
+	if _car_select_view != null:
+		_car_select_view.visible = view_name == VIEW_CAR_SELECT
+	if _track_select_view != null:
+		_track_select_view.visible = view_name == VIEW_TRACK_SELECT
+	if sync:
+		_sync_all_ui()
+
+
+func _show_home() -> void:
+	_show_view(VIEW_HOME)
+
+
+func _show_car_select() -> void:
+	_show_view(VIEW_CAR_SELECT)
+
+
+func _show_track_select() -> void:
+	_show_view(VIEW_TRACK_SELECT)
+
+
+func _toggle_settings() -> void:
+	_settings_visible = not _settings_visible
+	if _settings_panel != null:
+		_settings_panel.visible = _settings_visible
+
+
+func _select_car(car_id: StringName) -> void:
+	_preview_car_id = &""
+	var session := _session()
+	if session != null and session.has_method("set_car"):
+		session.call("set_car", car_id)
+	_sync_from_session()
+	_rebuild_car_select()
+
+
+func _select_skin(skin_id: StringName) -> void:
+	_preview_car_id = &""
+	var session := _session()
+	if session != null and session.has_method("set_car_skin"):
+		session.call("set_car_skin", _selected_car_id, skin_id)
+	_sync_from_session()
+	_rebuild_car_select()
+
+
+func _select_track(track_id: StringName) -> void:
+	_preview_track_id = &""
+	var track := _track_option(track_id)
+	if track.is_empty():
+		return
+	var session := _session()
+	if session != null and session.has_method("set_track"):
+		session.call("set_track", track_id, str(track.get("scene_path", "")))
+	_sync_from_session()
+	_rebuild_track_select()
+
+
+func _select_difficulty(difficulty_id: StringName) -> void:
+	var session := _session()
+	if session != null and session.has_method("set_difficulty"):
+		session.call("set_difficulty", str(difficulty_id))
+	_sync_from_session()
+	_sync_difficulty_ui()
+
+
+func _select_gear_mode(mode: String) -> void:
+	_selected_gear_mode = _normalize_gear_mode(mode, _selected_gear_mode)
+	var session := _session()
+	if session != null:
+		if session.has_method("set_gear_mode"):
+			session.call("set_gear_mode", _selected_gear_mode)
+		elif session.has_method("set_transmission_mode"):
+			session.call("set_transmission_mode", _selected_gear_mode)
+		elif session.has_method("set_shift_mode"):
+			session.call("set_shift_mode", _selected_gear_mode)
+		elif session.has_method("set_manual_gear_enabled"):
+			session.call("set_manual_gear_enabled", _selected_gear_mode == GEAR_MODE_MANUAL)
+		elif session.has_method("set_manual_gears_enabled"):
+			session.call("set_manual_gears_enabled", _selected_gear_mode == GEAR_MODE_MANUAL)
+		elif session.has_method("set_manual_shift_enabled"):
+			session.call("set_manual_shift_enabled", _selected_gear_mode == GEAR_MODE_MANUAL)
+	_sync_from_session()
+	_sync_gear_mode_ui()
+
+
+func _preview_car(car_id: StringName) -> void:
+	if car_id == &"" or car_id == _preview_car_id:
+		return
+	_preview_car_id = car_id
+	_sync_car_labels()
+	_rebuild_car_preview()
+
+
+func _clear_car_preview(car_id: StringName) -> void:
+	if _preview_car_id != car_id:
+		return
+	_preview_car_id = &""
+	_sync_car_labels()
+	_rebuild_car_preview()
+
+
+func _preview_track(track_id: StringName) -> void:
+	if track_id == &"" or track_id == _preview_track_id:
+		return
+	_preview_track_id = track_id
+	_sync_track_labels()
+
+
+func _clear_track_preview(track_id: StringName) -> void:
+	if _preview_track_id != track_id:
+		return
+	_preview_track_id = &""
+	_sync_track_labels()
+
+
+func _scroll_cards(card_group: StringName, direction: int) -> void:
+	var scroll := _car_cards_scroll if card_group == VIEW_CAR_SELECT else _track_cards_scroll
+	if scroll == null:
+		return
+	var step := _selection_card_width() + float(_card_gap())
+	var next_position := float(scroll.scroll_horizontal) + step * float(direction)
+	var horizontal_bar := scroll.get_h_scroll_bar()
+	if horizontal_bar != null:
+		next_position = clampf(next_position, horizontal_bar.min_value, horizontal_bar.max_value)
+	next_position = maxf(0.0, next_position)
+	_animate_cards_scroll(card_group, scroll, next_position)
+
+
+func _animate_cards_scroll(card_group: StringName, scroll: ScrollContainer, target_position: float) -> void:
+	var existing_tween := _car_cards_scroll_tween if card_group == VIEW_CAR_SELECT else _track_cards_scroll_tween
+	if existing_tween != null:
+		existing_tween.kill()
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(scroll, "scroll_horizontal", roundi(target_position), CARD_SCROLL_TWEEN_SECONDS)
+	if card_group == VIEW_CAR_SELECT:
+		_car_cards_scroll_tween = tween
+	else:
+		_track_cards_scroll_tween = tween
+
+
+func _kill_card_scroll_tweens() -> void:
+	if _car_cards_scroll_tween != null:
+		_car_cards_scroll_tween.kill()
+		_car_cards_scroll_tween = null
+	if _track_cards_scroll_tween != null:
+		_track_cards_scroll_tween.kill()
+		_track_cards_scroll_tween = null
+
+
+func _start_race_loading() -> void:
+	if not _selected_track_can_start():
+		_sync_track_start_state()
+		return
+	var session := _session()
+	if session != null and session.has_method("prepare_race_loading"):
+		session.call("prepare_race_loading")
+	_stop_menu_audio(0.25)
+	get_tree().change_scene_to_file(RACE_LOADING_SCENE_PATH)
+
+
+func _on_master_percent_changed(value: float) -> void:
+	if _master_value_label != null:
+		_master_value_label.text = str(roundi(value))
+	var session := _session()
+	if session != null and session.has_method("set_master_volume"):
+		session.call("set_master_volume", value / 100.0)
+
+
+func _on_music_percent_changed(value: float) -> void:
+	if _music_value_label != null:
+		_music_value_label.text = str(roundi(value))
+	var session := _session()
+	if session != null and session.has_method("set_music_volume"):
+		session.call("set_music_volume", value / 100.0)
+
+
+func _on_sfx_percent_changed(value: float) -> void:
+	if _sfx_value_label != null:
+		_sfx_value_label.text = str(roundi(value))
+	var session := _session()
+	if session != null and session.has_method("set_sfx_volume"):
+		session.call("set_sfx_volume", value / 100.0)
+
+
+func _on_brightness_percent_changed(value: float) -> void:
+	if _brightness_value_label != null:
+		_brightness_value_label.text = str(roundi(value))
+	var session := _session()
+	if session != null and session.has_method("set_brightness_percent"):
+		session.call("set_brightness_percent", value)
+
+
+func _sync_from_session() -> void:
+	var session := _session()
+	if session == null:
+		return
+	if session.has_method("get_car_id"):
+		_selected_car_id = StringName(str(session.call("get_car_id")))
+	if session.has_method("get_car_skin_id"):
+		_selected_skin_id = StringName(str(session.call("get_car_skin_id")))
+	if session.has_method("get_track_id"):
+		_selected_track_id = StringName(str(session.call("get_track_id")))
+	if session.has_method("get_difficulty"):
+		_selected_difficulty_id = str(session.call("get_difficulty"))
+	_selected_gear_mode = _gear_mode_from_session(session, _selected_gear_mode)
+
+
+func _sync_all_ui() -> void:
+	_sync_settings_ui()
+	_sync_card_buttons()
+	_sync_car_labels()
+	_sync_track_labels()
+	_sync_difficulty_ui()
+	_sync_gear_mode_ui()
+	_sync_track_start_state()
+	_rebuild_car_preview()
+
+
+func _sync_settings_ui() -> void:
+	var session := _session()
+	if session == null:
+		return
+	if _master_slider != null and session.has_method("get_master_volume"):
+		var master_percent := roundf(float(session.call("get_master_volume")) * 100.0)
+		_master_slider.set_value_no_signal(master_percent)
+		_master_value_label.text = str(roundi(master_percent))
+	if _music_slider != null and session.has_method("get_music_volume"):
+		var music_percent := roundf(float(session.call("get_music_volume")) * 100.0)
+		_music_slider.set_value_no_signal(music_percent)
+		_music_value_label.text = str(roundi(music_percent))
+	if _sfx_slider != null and session.has_method("get_sfx_volume"):
+		var sfx_percent := roundf(float(session.call("get_sfx_volume")) * 100.0)
+		_sfx_slider.set_value_no_signal(sfx_percent)
+		_sfx_value_label.text = str(roundi(sfx_percent))
+	if _brightness_slider != null and session.has_method("get_brightness_percent"):
+		var brightness_percent := roundf(float(session.call("get_brightness_percent")))
+		_brightness_slider.set_value_no_signal(brightness_percent)
+		_brightness_value_label.text = str(roundi(brightness_percent))
+
+
+func _sync_card_buttons() -> void:
+	for key: Variant in _car_buttons.keys():
+		var button := _car_buttons[key] as Button
+		if button != null:
+			button.button_pressed = StringName(key) == _selected_car_id
+	for key: Variant in _skin_buttons.keys():
+		var button := _skin_buttons[key] as Button
+		if button != null:
+			button.button_pressed = StringName(key) == _selected_skin_id
+	for key: Variant in _track_buttons.keys():
+		var button := _track_buttons[key] as Button
+		if button != null:
+			button.button_pressed = StringName(key) == _selected_track_id
+	for key: Variant in _difficulty_buttons.keys():
+		var button := _difficulty_buttons[key] as Button
+		if button != null:
+			var selected := StringName(key) == StringName(_selected_difficulty_id)
+			button.button_pressed = selected
+			_apply_difficulty_button_style(button, selected)
+	_sync_card_nav()
+
+
+func _sync_card_nav() -> void:
+	var car_needs_arrows := _car_options().size() > _visible_card_capacity()
+	var track_needs_arrows := _track_options().size() > _visible_card_capacity()
+	for button: Button in [_car_prev_button, _car_next_button]:
+		if button != null:
+			button.disabled = not car_needs_arrows
+	for button: Button in [_track_prev_button, _track_next_button]:
+		if button != null:
+			button.disabled = not track_needs_arrows
+
+
+func _sync_car_labels() -> void:
+	var car := _displayed_car_option()
+	var skin := _displayed_skin_option()
+	if _car_name_label != null:
+		_car_name_label.text = str(car.get("display_name", ""))
+	if _car_class_label != null:
+		_car_class_label.text = "%s  /  %s" % [str(car.get("vehicle_class", "")), str(skin.get("display_name", ""))]
+	if _car_description_label != null:
+		_car_description_label.text = str(car.get("description", ""))
+	var stats: Dictionary = car.get("stats", {})
+	for stat_name: String in STAT_ORDER:
+		var label := _car_stat_labels.get(stat_name, null) as Label
+		if label != null:
+			label.text = "%s  %d" % [STAT_LABELS.get(stat_name, stat_name).to_upper(), int(stats.get(stat_name, 0))]
+		var bar := _car_stat_bars.get(stat_name, null) as ProgressBar
+		if bar != null:
+			bar.value = int(stats.get(stat_name, 0))
+
+
+func _sync_track_labels() -> void:
+	var track := _displayed_track_option()
+	if _track_name_label != null:
+		_track_name_label.text = str(track.get("display_name", ""))
+	if _track_meta_label != null:
+		_track_meta_label.text = "%s  /  %d LAPS  /  %.0fM" % [
+			str(track.get("environment", &"circuit")).replace("_", " ").to_upper(),
+			int(track.get("lap_count", 1)),
+			float(track.get("target_length_m", 0.0)),
+		]
+	if _track_description_label != null:
+		_track_description_label.text = str(track.get("description", ""))
+	if _track_preview_texture_rect != null:
+		_track_preview_texture_rect.texture = _load_track_preview_texture(track)
+	if _track_length_label != null:
+		_track_length_label.text = "%.1f KM" % (float(track.get("target_length_m", 0.0)) / 1000.0)
+	if _track_lap_label != null:
+		_track_lap_label.text = str(int(track.get("lap_count", 1)))
+	if _track_environment_label != null:
+		_track_environment_label.text = str(track.get("environment", &"circuit")).replace("_", " ").to_upper()
+	if _track_difficulty_label != null:
+		_track_difficulty_label.text = _selected_difficulty_id.to_upper()
+	_sync_track_start_state()
+
+
+func _sync_difficulty_ui() -> void:
+	var difficulty := _selected_difficulty_option()
+	for key: Variant in _difficulty_buttons.keys():
+		var button := _difficulty_buttons[key] as Button
+		if button == null:
+			continue
+		var selected := StringName(key) == StringName(_selected_difficulty_id)
+		button.button_pressed = selected
+		_apply_difficulty_button_style(button, selected)
+	if _difficulty_description_label != null:
+		_difficulty_description_label.text = str(difficulty.get("description", ""))
+	if _track_difficulty_label != null:
+		_track_difficulty_label.text = _selected_difficulty_id.to_upper()
+
+
+func _sync_gear_mode_ui() -> void:
+	for key: Variant in _gear_mode_buttons.keys():
+		var button := _gear_mode_buttons[key] as Button
+		if button == null:
+			continue
+		var selected := str(key) == _selected_gear_mode
+		button.button_pressed = selected
+		_apply_gear_mode_button_style(button, selected)
+
+
+func _sync_track_start_state() -> void:
+	if _race_now_button == null:
+		return
+	var can_start := _selected_track_can_start()
+	_race_now_button.disabled = not can_start
+	if can_start:
+		_race_now_button.text = "RACE NOW"
+		_race_now_button.tooltip_text = "Start race"
+	else:
+		var track := _selected_track_option()
+		var reason := str(track.get("locked_reason", track.get("unavailable_reason", "Track unavailable")))
+		if reason.strip_edges().is_empty():
+			reason = "Track unavailable"
+		_race_now_button.text = "TRACK LOCKED"
+		_race_now_button.tooltip_text = reason
+
+
+func _rebuild_car_select() -> void:
+	_sync_all_ui()
+	if _active_view == VIEW_CAR_SELECT:
+		_build_interface()
+
+
+func _rebuild_track_select() -> void:
+	_sync_all_ui()
+	if _active_view == VIEW_TRACK_SELECT:
+		_build_interface()
+
+
+func _rebuild_car_preview() -> void:
+	if _preview_car_mount == null:
+		return
+	for child: Node in _preview_car_mount.get_children():
+		_preview_car_mount.remove_child(child)
+		child.queue_free()
+	var scene_path := _car_preview_instance_path()
+	var packed := _load_preview_packed_scene(scene_path)
+	if packed == null:
+		return
+	var car := packed.instantiate()
+	_preview_car_mount.add_child(car)
+	_disable_preview_processing(car)
+	if car is Node3D:
+		var car3d := car as Node3D
+		car3d.scale = Vector3.ONE
+		car3d.rotation_degrees = Vector3.ZERO
+		var model_rotation := _displayed_car_model_rotation_degrees()
+		var preview_rotation := Vector3(model_rotation.x, model_rotation.y - 35.0, model_rotation.z)
+		_fit_preview_model_to_platform(car3d, preview_rotation)
+		car3d.rotation_degrees = preview_rotation
+	if car.has_method("set_controls_enabled"):
+		car.call("set_controls_enabled", false)
+	if car.has_method("set_car_color_variant"):
+		car.call("set_car_color_variant", _displayed_car_color())
+	_soften_preview_car_reflections(car)
+
+
+func _load_preview_packed_scene(scene_path: String) -> PackedScene:
+	if scene_path.is_empty():
+		return null
+	if _car_preview_scene_cache.has(scene_path):
+		return _car_preview_scene_cache[scene_path] as PackedScene
+	var packed := load(scene_path) as PackedScene
+	if packed != null:
+		_car_preview_scene_cache[scene_path] = packed
+	return packed
+
+
+func _fit_preview_model_to_platform(root: Node3D, preview_rotation_degrees: Vector3 = Vector3.ZERO) -> void:
+	var bounds_info := _calculate_preview_bounds(root)
+	if not bool(bounds_info.get("has_bounds", false)):
+		return
+	var bounds := bounds_info.get("bounds", AABB()) as AABB
+	var horizontal_size := maxf(bounds.size.x, bounds.size.z)
+	if horizontal_size <= 0.001:
+		return
+	var preview_scale_multiplier := _displayed_car_preview_scale_multiplier()
+	var scale_factor := clampf((4.15 / horizontal_size) * preview_scale_multiplier, 0.08, 9.0)
+	var center := bounds.get_center()
+	var preview_rotation := Vector3(
+			deg_to_rad(preview_rotation_degrees.x),
+			deg_to_rad(preview_rotation_degrees.y),
+			deg_to_rad(preview_rotation_degrees.z)
+	)
+	var rotated_center := Basis.from_euler(preview_rotation) * (center * scale_factor)
+	root.scale *= scale_factor
+	root.position = Vector3(-rotated_center.x, -bounds.position.y * scale_factor, -rotated_center.z)
+
+
+func _calculate_preview_bounds(root: Node3D) -> Dictionary:
+	var mesh_instances: Array[MeshInstance3D] = []
+	_collect_preview_mesh_instances(root, mesh_instances)
+	var has_bounds := false
+	var bounds := AABB()
+	for mesh_instance: MeshInstance3D in mesh_instances:
+		if mesh_instance.mesh == null:
+			continue
+		var local_transform := _local_transform_to_root(root, mesh_instance)
+		var local_bounds := _transform_aabb(local_transform, mesh_instance.mesh.get_aabb())
+		if not has_bounds:
+			bounds = local_bounds
+			has_bounds = true
+		else:
+			bounds = bounds.merge(local_bounds)
+	return {"has_bounds": has_bounds, "bounds": bounds}
+
+
+func _collect_preview_mesh_instances(root: Node, output: Array[MeshInstance3D]) -> void:
+	if root is MeshInstance3D:
+		output.append(root as MeshInstance3D)
+	for child: Node in root.get_children():
+		_collect_preview_mesh_instances(child, output)
+
+
+func _local_transform_to_root(root: Node3D, node: Node3D) -> Transform3D:
+	var result := Transform3D.IDENTITY
+	var current: Node = node
+	while current != null and current != root:
+		if current is Node3D:
+			result = (current as Node3D).transform * result
+		current = current.get_parent()
+	return result
+
+
+func _transform_aabb(transform: Transform3D, source: AABB) -> AABB:
+	var has_point := false
+	var transformed := AABB()
+	for index: int in range(8):
+		var point := transform * source.get_endpoint(index)
+		if not has_point:
+			transformed = AABB(point, Vector3.ZERO)
+			has_point = true
+		else:
+			transformed = transformed.expand(point)
+	return transformed
+
+
+func _disable_preview_processing(root: Node) -> void:
+	root.process_mode = Node.PROCESS_MODE_DISABLED
+	root.set_process(false)
+	root.set_physics_process(false)
+	root.set_process_input(false)
+	root.set_process_unhandled_input(false)
+	for child: Node in root.get_children():
+		_disable_preview_processing(child)
+
+
+func _soften_preview_car_reflections(root: Node) -> void:
+	if root == null:
+		return
+	if root is MeshInstance3D:
+		_soften_preview_mesh_materials(root as MeshInstance3D)
+	for child: Node in root.get_children():
+		_soften_preview_car_reflections(child)
+
+
+func _soften_preview_mesh_materials(mesh_instance: MeshInstance3D) -> void:
+	if mesh_instance.material_override != null:
+		mesh_instance.material_override = _softened_preview_material(mesh_instance.material_override, mesh_instance.name)
+		return
+	if mesh_instance.mesh == null:
+		return
+	var surface_count := mesh_instance.mesh.get_surface_count()
+	for surface_index: int in range(surface_count):
+		var source_material := mesh_instance.get_surface_override_material(surface_index)
+		if source_material == null:
+			source_material = mesh_instance.mesh.surface_get_material(surface_index)
+		var softened_material := _softened_preview_material(source_material, mesh_instance.name)
+		if softened_material != null:
+			mesh_instance.set_surface_override_material(surface_index, softened_material)
+
+
+func _softened_preview_material(source_material: Material, context_name: StringName) -> Material:
+	if not (source_material is BaseMaterial3D):
+		return source_material
+	var material := source_material.duplicate() as BaseMaterial3D
+	if material == null:
+		return source_material
+	var material_context := ("%s %s" % [material.resource_name, String(context_name)]).to_lower()
+	var min_roughness := 0.36
+	if _text_contains_any(material_context, ["glass", "window", "windshield", "windscreen"]):
+		min_roughness = 0.22
+	elif _text_contains_any(material_context, ["tire", "tyre", "rubber"]):
+		min_roughness = 0.62
+	elif _text_contains_any(material_context, ["wheel", "rim", "brake", "caliper"]):
+		min_roughness = 0.42
+	material.roughness = maxf(material.roughness, min_roughness)
+	material.set("metallic_specular", minf(float(material.get("metallic_specular")), 0.38))
+	return material
+
+
+func _text_contains_any(text: String, needles: Array[String]) -> bool:
+	for needle: String in needles:
+		if text.contains(needle):
+			return true
+	return false
+
+
+func _position_preview_camera() -> void:
+	if _preview_camera == null:
+		return
+	var elevation_radians := deg_to_rad(PREVIEW_CAMERA_ELEVATION_DEGREES)
+	var camera_position := Vector3(0.0, sin(elevation_radians) * PREVIEW_CAMERA_DISTANCE, cos(elevation_radians) * PREVIEW_CAMERA_DISTANCE)
+	_preview_camera.look_at_from_position(camera_position, Vector3(PREVIEW_CAMERA_TARGET_OFFSET_X, 0.85, 0.0), Vector3.UP)
+
+
+func _on_preview_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		if mouse_button.button_index == MOUSE_BUTTON_LEFT:
+			_preview_dragging = mouse_button.pressed
+			_preview_last_mouse = mouse_button.position
+	elif event is InputEventMouseMotion and _preview_dragging and _preview_turntable != null:
+		var motion := event as InputEventMouseMotion
+		var delta := motion.position - _preview_last_mouse
+		_preview_turntable.rotation_degrees.y += delta.x * 0.35
+		_preview_turntable_yaw_degrees = _preview_turntable.rotation_degrees.y
+		_preview_last_mouse = motion.position
+
+
+func _update_car_preview_idle_rotation(delta: float) -> void:
+	if _active_view != VIEW_CAR_SELECT or _preview_turntable == null or not is_instance_valid(_preview_turntable):
+		return
+	if is_nan(delta) or is_inf(delta) or delta <= 0.0:
+		return
+	if _preview_dragging:
+		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_preview_dragging = false
+		else:
+			return
+	_preview_turntable.rotation_degrees.y += PREVIEW_IDLE_ROTATION_DEGREES_PER_SECOND * delta
+	_preview_turntable_yaw_degrees = _preview_turntable.rotation_degrees.y
+
+
+func _go_back() -> void:
+	if _active_view == VIEW_TRACK_SELECT:
+		_show_view(VIEW_CAR_SELECT)
+	elif _active_view == VIEW_CAR_SELECT:
+		_show_view(VIEW_HOME)
+	elif _settings_visible:
+		_toggle_settings()
+
+
+func _queue_rebuild() -> void:
+	if _rebuild_queued:
+		return
+	_rebuild_queued = true
+	call_deferred("_rebuild_after_resize")
+
+
+func _rebuild_after_resize() -> void:
+	_rebuild_queued = false
+	_build_interface()
+
+
+func _start_menu_audio() -> void:
+	var menu_audio_controller_script := load(MENU_AUDIO_CONTROLLER_SCRIPT_PATH) as Script
+	if menu_audio_controller_script == null:
+		return
+	_menu_audio = menu_audio_controller_script.call("resolve", self) as Node
+	if _menu_audio == null:
+		return
+	if _menu_audio.has_method("play_menu_music"):
+		_menu_audio.call("play_menu_music")
+	_bind_menu_audio()
+
+
+func _bind_menu_audio() -> void:
+	if _menu_audio != null and _menu_audio.has_method("bind_buttons"):
+		_menu_audio.call("bind_buttons", self)
+
+
+func _stop_menu_audio(fade_seconds: float) -> void:
+	if _menu_audio != null and _menu_audio.has_method("stop_menu_music"):
+		_menu_audio.call("stop_menu_music", fade_seconds)
+
+
+func _session() -> Node:
+	return get_node_or_null("/root/GameSession")
+
+
+func _car_options() -> Array:
+	var session := _session()
+	if session != null and session.has_method("get_car_options"):
+		var value: Variant = session.call("get_car_options")
+		if value is Array:
+			return value
+	return []
+
+
+func _track_options() -> Array:
+	var session := _session()
+	if session != null and session.has_method("get_track_options"):
+		var value: Variant = session.call("get_track_options")
+		if value is Array:
+			return value
+	return []
+
+
+func _difficulty_options() -> Array:
+	var session := _session()
+	if session != null and session.has_method("get_difficulty_options"):
+		var value: Variant = session.call("get_difficulty_options")
+		if value is Array:
+			return value
+	return []
+
+
+func _gear_mode_from_session(session: Node, fallback: String) -> String:
+	if session.has_method("get_gear_mode"):
+		return _normalize_gear_mode(session.call("get_gear_mode"), fallback)
+	if session.has_method("get_transmission_mode"):
+		return _normalize_gear_mode(session.call("get_transmission_mode"), fallback)
+	if session.has_method("get_shift_mode"):
+		return _normalize_gear_mode(session.call("get_shift_mode"), fallback)
+	if session.has_method("is_manual_gear_enabled"):
+		return GEAR_MODE_MANUAL if bool(session.call("is_manual_gear_enabled")) else GEAR_MODE_AUTOMATIC
+	if session.has_method("is_manual_gears_enabled"):
+		return GEAR_MODE_MANUAL if bool(session.call("is_manual_gears_enabled")) else GEAR_MODE_AUTOMATIC
+	if session.has_method("is_manual_shift_enabled"):
+		return GEAR_MODE_MANUAL if bool(session.call("is_manual_shift_enabled")) else GEAR_MODE_AUTOMATIC
+	if session.has_method("get_manual_gear_enabled"):
+		return GEAR_MODE_MANUAL if bool(session.call("get_manual_gear_enabled")) else GEAR_MODE_AUTOMATIC
+	if session.has_method("get_manual_gears_enabled"):
+		return GEAR_MODE_MANUAL if bool(session.call("get_manual_gears_enabled")) else GEAR_MODE_AUTOMATIC
+	if session.has_method("get_manual_shift_enabled"):
+		return GEAR_MODE_MANUAL if bool(session.call("get_manual_shift_enabled")) else GEAR_MODE_AUTOMATIC
+	return _normalize_gear_mode(fallback, GEAR_MODE_AUTOMATIC)
+
+
+func _normalize_gear_mode(value: Variant, fallback: String) -> String:
+	if value is bool:
+		return GEAR_MODE_MANUAL if bool(value) else GEAR_MODE_AUTOMATIC
+	var normalized := str(value).strip_edges().to_lower()
+	if normalized in ["manual", "man", "stick", "sequential"]:
+		return GEAR_MODE_MANUAL
+	if normalized in ["automatic", "auto", "assist", "assisted"]:
+		return GEAR_MODE_AUTOMATIC
+	return fallback if fallback in [GEAR_MODE_AUTOMATIC, GEAR_MODE_MANUAL] else GEAR_MODE_AUTOMATIC
+
+
+func _selected_track_can_start() -> bool:
+	return _track_can_start(_selected_track_option())
+
+
+func _track_can_start(track: Dictionary) -> bool:
+	if track.is_empty():
+		return false
+	if _option_flag_true(track, "locked"):
+		return false
+	if _option_flag_true(track, "unavailable"):
+		return false
+	if _option_flag_true(track, "disabled"):
+		return false
+	if _option_flag_false(track, "available"):
+		return false
+	if _option_flag_false(track, "is_available"):
+		return false
+	if _option_flag_false(track, "enabled"):
+		return false
+	if _option_flag_false(track, "is_enabled"):
+		return false
+	for key: String in ["status", "availability", "state"]:
+		if track.has(key):
+			var status := str(track.get(key, "")).strip_edges().to_lower()
+			if status in ["locked", "unavailable", "disabled", "closed", "blocked", "coming_soon"]:
+				return false
+	return true
+
+
+func _option_flag_true(option: Dictionary, key: String) -> bool:
+	if not option.has(key):
+		return false
+	return _variant_flag_true(option.get(key))
+
+
+func _option_flag_false(option: Dictionary, key: String) -> bool:
+	if not option.has(key):
+		return false
+	return _variant_flag_false(option.get(key))
+
+
+func _variant_flag_true(value: Variant) -> bool:
+	if value is bool:
+		return bool(value)
+	if value is int:
+		return int(value) != 0
+	if value is float:
+		return float(value) != 0.0
+	var text := str(value).strip_edges().to_lower()
+	return text in ["true", "1", "yes", "locked", "unavailable", "disabled", "closed", "blocked"]
+
+
+func _variant_flag_false(value: Variant) -> bool:
+	if value is bool:
+		return not bool(value)
+	if value is int:
+		return int(value) == 0
+	if value is float:
+		return float(value) == 0.0
+	var text := str(value).strip_edges().to_lower()
+	return text in ["false", "0", "no", "locked", "unavailable", "disabled", "closed", "blocked"]
+
+
+func _dictionary_float(option: Dictionary, key: String, fallback: float) -> float:
+	if not option.has(key):
+		return fallback
+	var value: Variant = option.get(key)
+	if value is float or value is int:
+		return float(value)
+	var text := str(value).strip_edges()
+	if text.is_valid_float():
+		return text.to_float()
+	return fallback
+
+
+func _dictionary_vector3(option: Dictionary, key: String, fallback: Vector3) -> Vector3:
+	if not option.has(key):
+		return fallback
+	var value: Variant = option.get(key)
+	if value is Vector3:
+		return value
+	if value is Vector2:
+		var vector2_value := value as Vector2
+		return Vector3(vector2_value.x, vector2_value.y, fallback.z)
+	if value is float or value is int:
+		var scalar := float(value)
+		return Vector3(scalar, scalar, scalar)
+	if value is Array:
+		var array_value: Array = value
+		if array_value.size() >= 3:
+			return Vector3(float(array_value[0]), float(array_value[1]), float(array_value[2]))
+	return fallback
+
+
+func _skin_presets() -> Array:
+	var session := _session()
+	if session != null and session.has_method("get_skin_presets"):
+		var value: Variant = session.call("get_skin_presets")
+		if value is Array:
+			return value
+	return []
+
+
+func _selected_car_option() -> Dictionary:
+	return _car_option(_selected_car_id)
+
+
+func _selected_car_index() -> int:
+	var options := _car_options()
+	for index: int in range(options.size()):
+		var option: Dictionary = options[index]
+		if StringName(option.get("id", &"")) == _selected_car_id:
+			return index
+	return 0
+
+
+func _displayed_car_option() -> Dictionary:
+	return _car_option(_preview_car_id) if _preview_car_id != &"" else _selected_car_option()
+
+
+func _displayed_car_preview_scale_multiplier() -> float:
+	var car := _displayed_car_option()
+	return clampf(_dictionary_float(car, "preview_scale_multiplier", 1.0), 0.2, 3.0)
+
+
+func _displayed_car_model_rotation_degrees() -> Vector3:
+	var car := _displayed_car_option()
+	return _dictionary_vector3(car, "model_mount_rotation_degrees", Vector3.ZERO)
+
+
+func _selected_skin_option() -> Dictionary:
+	var session := _session()
+	if session != null and session.has_method("get_selected_skin_preset"):
+		var value: Variant = session.call("get_selected_skin_preset")
+		if value is Dictionary:
+			return value
+	return {}
+
+
+func _displayed_skin_option() -> Dictionary:
+	var car := _displayed_car_option()
+	var car_id := StringName(car.get("id", &""))
+	if car_id == _selected_car_id:
+		return _selected_skin_option()
+	return _skin_option(StringName(car.get("default_skin_id", _selected_skin_id)))
+
+
+func _selected_track_option() -> Dictionary:
+	return _track_option(_selected_track_id)
+
+
+func _selected_track_index() -> int:
+	var options := _track_options()
+	for index: int in range(options.size()):
+		var option: Dictionary = options[index]
+		if StringName(option.get("id", &"")) == _selected_track_id:
+			return index
+	return 0
+
+
+func _displayed_track_option() -> Dictionary:
+	return _track_option(_preview_track_id) if _preview_track_id != &"" else _selected_track_option()
+
+
+func _selected_difficulty_option() -> Dictionary:
+	return _difficulty_option(StringName(_selected_difficulty_id))
+
+
+func _car_option(car_id: StringName) -> Dictionary:
+	for option: Dictionary in _car_options():
+		if StringName(option.get("id", &"")) == car_id:
+			return option
+	var options := _car_options()
+	return options[0] if not options.is_empty() else {}
+
+
+func _track_option(track_id: StringName) -> Dictionary:
+	for option: Dictionary in _track_options():
+		if StringName(option.get("id", &"")) == track_id:
+			return option
+	var options := _track_options()
+	return options[0] if not options.is_empty() else {}
+
+
+func _difficulty_option(difficulty_id: StringName) -> Dictionary:
+	for option: Dictionary in _difficulty_options():
+		if StringName(option.get("id", &"")) == difficulty_id:
+			return option
+	var options := _difficulty_options()
+	return options[0] if not options.is_empty() else {}
+
+
+func _skin_option(skin_id: StringName) -> Dictionary:
+	for skin: Dictionary in _skin_presets():
+		if StringName(skin.get("id", &"")) == skin_id:
+			return skin
+	return _selected_skin_option()
+
+
+func _skin_options_for_selected_car() -> Array:
+	var car := _selected_car_option()
+	var allowed: Array = car.get("skin_ids", [])
+	var result: Array = []
+	for skin: Dictionary in _skin_presets():
+		if allowed.has(StringName(skin.get("id", &""))):
+			result.append(skin)
+	return result
+
+
+func _selected_car_color() -> String:
+	var session := _session()
+	if session != null and session.has_method("get_car_color"):
+		return str(session.call("get_car_color"))
+	return "blue"
+
+
+func _displayed_car_color() -> String:
+	var skin := _displayed_skin_option()
+	if not skin.is_empty():
+		return str(skin.get("color_variant", _selected_car_color()))
+	return _selected_car_color()
+
+
+func _car_preview_instance_path() -> String:
+	var car := _displayed_car_option()
+	return str(car.get("preview_scene_path", car.get("scene_path", "res://scenes/player_car.tscn")))
+
+
+func _swatch_for_car(car: Dictionary) -> Color:
+	var default_skin_id := StringName(car.get("default_skin_id", &""))
+	for skin: Dictionary in _skin_presets():
+		if StringName(skin.get("id", &"")) == default_skin_id:
+			return _safe_color(skin.get("swatch", Color.WHITE))
+	return Color(0.46, 0.84, 1.0, 1.0)
+
+
+func _safe_color(value: Variant) -> Color:
+	if value is Color:
+		return value
+	return Color.WHITE
+
+
+func _load_track_preview_texture(track: Dictionary) -> Texture2D:
+	var path := str(track.get("preview_texture_path", ""))
+	if path.is_empty():
+		return _get_menu_background_texture()
+	var texture := _load_texture_safely(path)
+	return texture if texture != null else _get_menu_background_texture()
+
+
+func _load_car_card_texture(car: Dictionary) -> Texture2D:
+	var path := str(car.get("preview_texture_path", DEFAULT_CAR_CARD_TEXTURE_PATH))
+	if path.is_empty():
+		path = DEFAULT_CAR_CARD_TEXTURE_PATH
+	var texture := _load_texture_safely(path)
+	if texture != null:
+		return texture
+	if _car_card_texture == null and ResourceLoader.exists(DEFAULT_CAR_CARD_TEXTURE_PATH):
+		_car_card_texture = load(DEFAULT_CAR_CARD_TEXTURE_PATH) as Texture2D
+	return _car_card_texture if _car_card_texture != null else _get_menu_background_texture()
+
+
+func _get_menu_background_texture() -> Texture2D:
+	if _menu_background_texture == null and ResourceLoader.exists(MENU_BACKGROUND_TEXTURE_PATH):
+		_menu_background_texture = load(MENU_BACKGROUND_TEXTURE_PATH) as Texture2D
+	return _menu_background_texture
+
+
+func _load_texture_safely(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	if FileAccess.file_exists("%s.import" % path):
+		var imported_texture := load(path) as Texture2D
+		if imported_texture != null:
+			return imported_texture
+	return _load_raw_texture(path)
+
+
+func _load_raw_texture(path: String) -> Texture2D:
+	var image := Image.new()
+	var error := image.load(ProjectSettings.globalize_path(path))
+	if error != OK:
+		return null
+	return ImageTexture.create_from_image(image)
+
+
+func _selection_card_width() -> float:
+	var usable_width := _estimated_card_viewport_width()
+	var ui_scale := _responsive_scale()
+	var minimum_side := maxf(54.0, 72.0 * ui_scale)
+	var maximum_side := maxf(84.0, 170.0 * maxf(ui_scale, 1.0))
+	return clampf(usable_width * CHOICE_CARD_SIDE_RATIO, minimum_side, maximum_side)
+
+
+func _selection_card_height() -> float:
+	return _selection_card_width()
+
+
+func _estimated_card_viewport_width() -> float:
+	var viewport_width := get_viewport_rect().size.x
+	var estimated_arrows := float(_space(68, 92) * 2)
+	var estimated_gaps := float(_space(18, 32) * 2)
+	var usable_width := maxf(1.0, viewport_width - estimated_arrows - estimated_gaps)
+	return usable_width
+
+
+func _visible_card_capacity() -> int:
+	var step := _selection_card_width() + float(_card_gap())
+	if step <= 0.001:
+		return 1
+	return maxi(1, floori(_estimated_card_viewport_width() / step))
+
+
+func _card_gap() -> int:
+	return _space(14, 28)
+
+
+func _info_rail_width() -> float:
+	return _vw(SELECTION_INFO_RAIL_RATIO, 260.0, 380.0)
+
+
+func _font_px(minimum: int, maximum: int, vh_ratio: float) -> int:
+	var ui_scale := _responsive_scale()
+	var scaled_size := float(maximum) * ui_scale
+	var scaled_minimum := maxf(8.0, float(minimum) * minf(ui_scale, 1.0))
+	var scaled_maximum := float(maximum) * maxf(ui_scale, 1.0)
+	var height_size := get_viewport_rect().size.y * vh_ratio
+	return roundi(clampf(minf(scaled_size, height_size), scaled_minimum, scaled_maximum))
+
+
+func _space(minimum: int, maximum: int) -> int:
+	var ui_scale := _responsive_scale()
+	var scaled_minimum := maxf(1.0, float(minimum) * minf(ui_scale, 1.0))
+	var scaled_maximum := float(maximum) * maxf(ui_scale, 1.0)
+	return roundi(clampf(float(maximum) * ui_scale, scaled_minimum, scaled_maximum))
+
+
+func _vh(ratio: float, minimum: float, maximum: float) -> float:
+	var ui_scale := _responsive_scale()
+	return clampf(get_viewport_rect().size.y * ratio, minimum * minf(ui_scale, 1.0), maximum * maxf(ui_scale, 1.0))
+
+
+func _vw(ratio: float, minimum: float, maximum: float) -> float:
+	var ui_scale := _responsive_scale()
+	return clampf(get_viewport_rect().size.x * ratio, minimum * minf(ui_scale, 1.0), maximum * maxf(ui_scale, 1.0))
+
+
+func _responsive_scale() -> float:
+	var viewport_size := get_viewport_rect().size
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return 1.0
+	return clampf(
+		minf(viewport_size.x / UI_REFERENCE_SIZE.x, viewport_size.y / UI_REFERENCE_SIZE.y),
+		UI_MIN_SCALE,
+		UI_MAX_SCALE
+	)

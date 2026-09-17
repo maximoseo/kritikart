@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="EnvironmentKitProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/profiles/environment_kit_profile.gd" id="1_kit"]
+
+[resource]
+resource_name = "StormCoastEnvironmentKit"
+script = ExtResource("1_kit")
+kit_id = &"mountain_coastal_wet"
+display_name = "Mountain Coastal Wet Kit"
+environment_type = &"rainy_mountain_coastal"
+style_tags = PackedStringArray("rainy_coastal", "cliffside", "wet_road", "mist", "guardrails", "power_lines")
+module_scenes = PackedStringArray("res://assets/environment/storm_coast_cliff_rock_wall_hunyuan.glb", "res://assets/environment/storm_coast_concrete_barrier_hunyuan.glb", "res://assets/environment/storm_coast_floodlight_camera_post_hunyuan.glb", "res://assets/environment/generated_grandstand_hunyuan.glb")
+roadside_props = PackedStringArray("generated_concrete_barrier", "generated_floodlight_camera_post", "jump_warning_sign", "reflector_post", "power_line_pole", "service_barrier")
+background_props = PackedStringArray("generated_cliff_rock_wall", "distant_ocean_plane", "mountain_silhouette", "low_cloud_bank", "golden_haze_card")
+landmark_scenes = PackedStringArray("res://scenes/environment/storm_coast/ocean_reveal_landmark.tscn", "res://scenes/environment/storm_coast/cliffside_jump_viewpoint.tscn")
+lighting_overrides = {
+"fog_density": 0.085,
+"reflection_probe_priority": "road_surface_and_jump",
+"wetness_multiplier": 0.92
+}
+audio_ambience = &"storm_coast_light_rain_waves"
+weather_support_tags = PackedStringArray("light_rain", "wet_road", "coastal_mist")
+performance_budget = {
+"background_landmarks": 4,
+"hero_set_pieces": 1,
+"reflection_probes": 4,
+"roadside_prop_instances": 180
+}
+notes = "Reusable kit metadata for Storm Coast. The first generated GLB modules are imported and used sparsely by PremiumTrackDressing, with lightweight procedural fallback pieces between hero instances."

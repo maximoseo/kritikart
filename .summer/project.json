@@ -1,0 +1,11 @@
+{
+  "template": {
+    "id": "template/3d-racing-game",
+    "version": "1.0.4",
+    "repo": "https://github.com/SummerEngine/template-3d-racing-game",
+    "commit": "8305f5e68a5888e0f6053ca8ef5d7a0bd041aa79",
+    "tree_digest": "a6d31140518b7253da5527eafdc8bf8abc7e4253298d262f84194632e48a733c"
+  },
+  "toolkit_version": "3.1.0",
+  "created_at": "2026-09-17T12:47:37.374Z"
+}

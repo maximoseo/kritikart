@@ -1,0 +1,223 @@
+extends Control
+
+const FigmaUIFontScript := preload("res://scripts/ui/figma_ui_fonts.gd")
+const MAIN_MENU_SCENE_PATH: String = "res://scenes/ui/main_menu.tscn"
+const MENU_BACKGROUND_TEXTURE_PATH: String = "res://assets/ui/menu_showroom_background.png"
+const TIPS: Array[String] = [
+	"Brake before the corner, then accelerate through the exit.",
+	"Smooth steering keeps more speed than sudden corrections.",
+	"Use cockpit view when you need tighter apex timing.",
+]
+
+var _label: Label = null
+var _percent_label: Label = null
+var _progress: ProgressBar = null
+var _paths: Array[String] = []
+var _loaded_count: int = 0
+var _complete: bool = false
+
+
+func _ready() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_build_ui()
+	var session := get_node_or_null("/root/GameSession")
+	if session != null and session.has_method("get_boot_loading_manifest"):
+		var value: Variant = session.call("get_boot_loading_manifest")
+		if value is Array:
+			for item: Variant in value:
+				_paths.append(str(item))
+	if not _paths.has(MAIN_MENU_SCENE_PATH):
+		_paths.append(MAIN_MENU_SCENE_PATH)
+	_update_progress()
+
+
+func _process(_delta: float) -> void:
+	if _complete:
+		return
+	if _loaded_count < _paths.size():
+		_load_path(_paths[_loaded_count])
+		_loaded_count += 1
+		_update_progress()
+		return
+	_complete = true
+	_update_progress()
+	call_deferred("_enter_main_menu")
+
+
+func _build_ui() -> void:
+	var background := ColorRect.new()
+	background.color = Color(0.025, 0.028, 0.050, 1.0)
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(background)
+
+	var texture := TextureRect.new()
+	texture.texture = load(MENU_BACKGROUND_TEXTURE_PATH) as Texture2D
+	texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	texture.modulate = Color(1.0, 1.0, 1.0, 0.06)
+	texture.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(texture)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+
+	var stack := VBoxContainer.new()
+	stack.custom_minimum_size = Vector2(460.0, 0.0)
+	stack.add_theme_constant_override("separation", 18)
+	center.add_child(stack)
+
+	stack.add_child(_make_loading_summary("VEHICLE", _selected_car_name(), "CIRCUIT", _selected_track_name()))
+	stack.add_child(_make_centered_rule_label("LOADING"))
+
+	_label = Label.new()
+	_label.text = "PREPARING MENU"
+	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_label.add_theme_font_size_override("font_size", 10)
+	_label.add_theme_color_override("font_color", Color(0.34, 0.34, 0.48, 1.0))
+
+	_progress = ProgressBar.new()
+	_progress.min_value = 0.0
+	_progress.max_value = 100.0
+	_progress.show_percentage = false
+	_progress.custom_minimum_size = Vector2(1.0, 4.0)
+	_progress.add_theme_stylebox_override("background", _make_style(Color(1.0, 1.0, 1.0, 0.07), Color.TRANSPARENT, 0, 2))
+	_progress.add_theme_stylebox_override("fill", _make_style(Color(0.90, 0.0, 0.18, 1.0), Color(0.90, 0.0, 0.18, 1.0), 0, 2))
+	stack.add_child(_progress)
+
+	var status_row := HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 12)
+	stack.add_child(status_row)
+	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_row.add_child(_label)
+	_percent_label = Label.new()
+	_percent_label.text = "0%"
+	_percent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_percent_label.add_theme_font_size_override("font_size", 10)
+	_percent_label.add_theme_color_override("font_color", Color(0.90, 0.0, 0.18, 1.0))
+	status_row.add_child(_percent_label)
+
+	var tip_caption := Label.new()
+	tip_caption.text = "DRIVER TIP"
+	tip_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip_caption.add_theme_font_size_override("font_size", 9)
+	tip_caption.add_theme_color_override("font_color", Color(0.24, 0.24, 0.34, 1.0))
+	stack.add_child(tip_caption)
+	var tip := Label.new()
+	tip.text = TIPS[0]
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip.add_theme_font_size_override("font_size", 14)
+	tip.add_theme_color_override("font_color", Color(0.48, 0.48, 0.62, 1.0))
+	stack.add_child(tip)
+	FigmaUIFontScript.apply_tree(self)
+
+
+func _load_path(path: String) -> void:
+	if path.is_empty():
+		return
+	var resource := load(path)
+	var session := get_node_or_null("/root/GameSession")
+	if session != null and session.has_method("remember_preloaded_resource") and resource is Resource:
+		session.call("remember_preloaded_resource", path, resource)
+
+
+func _update_progress() -> void:
+	var ratio := 1.0 if _paths.is_empty() else float(_loaded_count) / float(_paths.size())
+	if _progress != null:
+		_progress.value = ratio * 100.0
+	if _label != null:
+		_label.text = "READY" if ratio >= 1.0 else "PREPARING MENU"
+	if _percent_label != null:
+		_percent_label.text = "%d%%" % roundi(ratio * 100.0)
+
+
+func _enter_main_menu() -> void:
+	var scene: PackedScene = null
+	var session := get_node_or_null("/root/GameSession")
+	if session != null and session.has_method("get_preloaded_resource"):
+		scene = session.call("get_preloaded_resource", MAIN_MENU_SCENE_PATH) as PackedScene
+	if scene == null:
+		scene = load(MAIN_MENU_SCENE_PATH) as PackedScene
+	if scene != null:
+		get_tree().change_scene_to_packed(scene)
+	else:
+		get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
+
+
+func _make_loading_summary(left_label: String, left_value: String, right_label: String, right_value: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	row.add_child(_make_summary_stack(left_label, left_value, HORIZONTAL_ALIGNMENT_RIGHT))
+	var divider := ColorRect.new()
+	divider.color = Color(1.0, 1.0, 1.0, 0.10)
+	divider.custom_minimum_size = Vector2(1.0, 32.0)
+	row.add_child(divider)
+	row.add_child(_make_summary_stack(right_label, right_value, HORIZONTAL_ALIGNMENT_LEFT))
+	return row
+
+
+func _make_summary_stack(label_text: String, value_text: String, alignment: HorizontalAlignment) -> VBoxContainer:
+	var stack := VBoxContainer.new()
+	var label := Label.new()
+	label.text = label_text
+	label.horizontal_alignment = alignment
+	label.add_theme_font_size_override("font_size", 9)
+	label.add_theme_color_override("font_color", Color(0.30, 0.30, 0.42, 1.0))
+	stack.add_child(label)
+	var value := Label.new()
+	value.text = value_text
+	value.horizontal_alignment = alignment
+	value.add_theme_font_size_override("font_size", 12)
+	value.add_theme_color_override("font_color", Color(0.48, 0.48, 0.62, 1.0))
+	stack.add_child(value)
+	return stack
+
+
+func _make_centered_rule_label(text: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	for side: int in range(3):
+		if side == 1:
+			var label := Label.new()
+			label.text = text
+			label.add_theme_font_size_override("font_size", 10)
+			label.add_theme_color_override("font_color", Color(0.34, 0.34, 0.48, 1.0))
+			row.add_child(label)
+		else:
+			var line := ColorRect.new()
+			line.color = Color(1.0, 1.0, 1.0, 0.14)
+			line.custom_minimum_size = Vector2(26.0, 1.0)
+			row.add_child(line)
+	return row
+
+
+func _make_style(fill: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	return style
+
+
+func _selected_car_name() -> String:
+	var session := get_node_or_null("/root/GameSession")
+	if session != null and session.has_method("get_selected_car_option"):
+		var car: Variant = session.call("get_selected_car_option")
+		if car is Dictionary:
+			var car_dict: Dictionary = car
+			return str(car_dict.get("short_name", car_dict.get("display_name", "Summer GT")))
+	return "Summer GT"
+
+
+func _selected_track_name() -> String:
+	var session := get_node_or_null("/root/GameSession")
+	if session != null and session.has_method("get_selected_track_option"):
+		var track: Variant = session.call("get_selected_track_option")
+		if track is Dictionary:
+			var track_dict: Dictionary = track
+			return str(track_dict.get("short_name", track_dict.get("display_name", "Storm Coast")))
+	return "Storm Coast"
