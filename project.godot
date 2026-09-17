@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameSession="*res://scripts/game/game_session.gd"
+Leaderboards="*res://scripts/game/leaderboards.gd"
 
 [dotnet]
 
