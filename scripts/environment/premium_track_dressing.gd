@@ -112,9 +112,9 @@ func _generate_coastal_mountain() -> void:
 
 func _add_city_skyline() -> void:
 	var material_palette: Array[StandardMaterial3D] = [
-		_material(Color(0.20, 0.23, 0.25, 1.0), 0.62, 0.12),
-		_material(Color(0.27, 0.30, 0.33, 1.0), 0.55, 0.18),
-		_material(Color(0.15, 0.18, 0.21, 1.0), 0.68, 0.10),
+		_material(Color(0.86, 0.90, 0.96, 1.0), 0.9, 0.0),
+		_material(Color(0.98, 0.84, 0.72, 1.0), 0.9, 0.0),
+		_material(Color(0.76, 0.90, 0.96, 1.0), 0.9, 0.0),
 	]
 	for index: int in range(building_count):
 		var angle := lerpf(-0.92, 0.92, float(index) / maxf(float(building_count - 1), 1.0))
@@ -166,7 +166,7 @@ func _add_grandstand(stand_position: Vector3, size: Vector3, yaw_degrees: float)
 	base.mesh = base_mesh
 	base.position = stand_position
 	base.rotation_degrees.y = yaw_degrees
-	base.material_override = _material(Color(0.12, 0.14, 0.15, 1.0), 0.74, 0.2)
+	base.material_override = _material(Color(0.94, 0.94, 0.92, 1.0), 0.74, 0.0)
 	_generated_root.add_child(base)
 	_assign_owner(base)
 
@@ -252,7 +252,7 @@ func _add_start_gantry() -> void:
 	bridge_mesh.size = Vector3(29.0, 0.62, 0.55)
 	bridge.mesh = bridge_mesh
 	bridge.position = Vector3(0.0, 6.85, 0.0)
-	bridge.material_override = _material(Color(0.16, 0.18, 0.19, 1.0), 0.28, 0.52)
+	bridge.material_override = _material(Color(0.88, 0.90, 0.92, 1.0), 0.28, 0.0)
 	gantry_root.add_child(bridge)
 	_assign_owner(bridge)
 
@@ -436,9 +436,9 @@ func _add_trackside_service_posts(track_provider: Node, track_length_m: float) -
 func _add_trackside_rock_clusters(track_provider: Node, track_length_m: float) -> void:
 	var cliff_scene: PackedScene = _load_packed_scene(generated_cliff_scene_path)
 	var rock_materials: Array[StandardMaterial3D] = [
-		_material(Color(0.18, 0.22, 0.22, 1.0), 0.82, 0.02),
-		_material(Color(0.24, 0.27, 0.26, 1.0), 0.78, 0.03),
-		_material(Color(0.12, 0.16, 0.15, 1.0), 0.88, 0.0),
+		_material(Color(0.46, 0.78, 0.42, 1.0), 0.82, 0.0),
+		_material(Color(0.72, 0.64, 0.46, 1.0), 0.78, 0.0),
+		_material(Color(0.36, 0.66, 0.34, 1.0), 0.88, 0.0),
 	]
 	var cluster_index: int = 0
 	var distance_m: float = 88.0
@@ -483,8 +483,8 @@ func _add_trackside_rock_clusters(track_provider: Node, track_length_m: float) -
 
 
 func _add_trackside_foliage_clusters(track_provider: Node, track_length_m: float) -> void:
-	var foliage_material := _material(Color(0.055, 0.12, 0.075, 1.0), 0.94, 0.0)
-	var trunk_material := _material(Color(0.13, 0.09, 0.06, 1.0), 0.88, 0.0)
+	var foliage_material := _material(Color(0.30, 0.72, 0.30, 1.0), 0.94, 0.0)
+	var trunk_material := _material(Color(0.55, 0.38, 0.24, 1.0), 0.88, 0.0)
 	var cluster_index: int = 0
 	var distance_m: float = 120.0
 	while distance_m < track_length_m - 80.0:
@@ -833,7 +833,7 @@ func _add_ocean_plane() -> void:
 	mesh.size = Vector2(620.0, 340.0)
 	ocean.mesh = mesh
 	ocean.position = Vector3(0.0, -5.5, -cliff_distance_m)
-	ocean.material_override = _material(Color(0.02, 0.16, 0.25, 1.0), 0.22, 0.08)
+	ocean.material_override = _material(Color(0.16, 0.72, 0.88, 1.0), 0.22, 0.0)
 	_generated_root.add_child(ocean)
 	_assign_owner(ocean)
 
@@ -872,7 +872,7 @@ func _add_warning_chevrons(index: int, chevron_position: Vector3, yaw_degrees: f
 	board.mesh = mesh
 	board.position = chevron_position
 	board.rotation_degrees.y = yaw_degrees
-	board.material_override = _material(Color(0.055, 0.06, 0.06, 1.0), 0.32, 0.2)
+	board.material_override = _material(Color(0.90, 0.90, 0.88, 1.0), 0.32, 0.0)
 	_generated_root.add_child(board)
 	_assign_owner(board)
 
@@ -913,7 +913,7 @@ func _add_cliffs() -> void:
 				rad_to_deg(angle) * 0.35 + float(chunk_index - 1) * 9.0,
 				4.5 * sin(float(index + chunk_index))
 			)
-			rock.material_override = _material(Color(0.22, 0.27, 0.28, 1.0), 0.78, 0.08)
+			rock.material_override = _material(Color(0.66, 0.60, 0.52, 1.0), 0.78, 0.0)
 			_generated_root.add_child(rock)
 			_assign_owner(rock)
 

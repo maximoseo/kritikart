@@ -13,6 +13,7 @@ const FigmaUIFontScript := preload("res://scripts/ui/figma_ui_fonts.gd")
 @export_range(0.0, 3.0, 0.05) var results_music_fade_seconds: float = 0.75
 
 const MENU_AUDIO_CONTROLLER_SCRIPT_PATH: String = "res://scripts/audio/menu_audio_controller.gd"
+const TouchControlsScript := preload("res://scripts/ui/touch_controls.gd")
 const RESULT_BUTTON_BOLD_FONT_PATH: String = "res://assets/fonts/Rajdhani-Bold.ttf"
 const COUNTDOWN_TEXTURE_PATHS: Dictionary = {
 	3: "res://assets/ui/countdown_3.png",
@@ -84,6 +85,7 @@ var _finish_transition_tween: Tween = null
 var _finish_transition_active: bool = false
 var _max_player_speed_kmh: int = 0
 var _last_results: Array = []
+var _touch_controls: CanvasLayer = null
 
 
 func _ready() -> void:
@@ -109,6 +111,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _build_interface() -> void:
 	_build_countdown_interface()
+	_touch_controls = TouchControlsScript.new()
+	_touch_controls.name = "TouchControls"
+	add_child(_touch_controls)
 
 	_overlay_root = Control.new()
 	_overlay_root.name = "OverlayRoot"
@@ -450,6 +455,11 @@ func _toggle_pause() -> void:
 		_show_pause()
 
 
+func _set_touch_controls_active(active: bool) -> void:
+	if _touch_controls != null and _touch_controls.has_method("set_controls_active"):
+		_touch_controls.call("set_controls_active", active)
+
+
 func _show_pause() -> void:
 	_results_visible = false
 	if _results_root != null:
@@ -460,6 +470,7 @@ func _show_pause() -> void:
 	if _end_race_button != null:
 		_end_race_button.visible = true
 	_overlay_root.visible = true
+	_set_touch_controls_active(false)
 	_sync_settings_ui()
 	get_tree().paused = true
 	_resume_button.grab_focus()
@@ -470,6 +481,7 @@ func _resume_race() -> void:
 		return
 	get_tree().paused = false
 	_overlay_root.visible = false
+	_set_touch_controls_active(true)
 
 
 func _restart_race() -> void:
@@ -497,6 +509,7 @@ func _return_to_main_menu() -> void:
 
 func _on_race_finished(results: Array) -> void:
 	_hide_countdown()
+	_set_touch_controls_active(false)
 	_last_results = results.duplicate()
 	_overlay_root.visible = false
 	if _results_root != null:
@@ -509,6 +522,7 @@ func _on_race_started() -> void:
 	_stop_results_music(0.0)
 	_max_player_speed_kmh = 0
 	_results_visible = false
+	_set_touch_controls_active(true)
 	if _results_root != null:
 		_results_root.visible = false
 	if not _countdown_showing_go:

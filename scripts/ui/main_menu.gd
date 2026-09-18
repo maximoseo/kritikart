@@ -257,7 +257,7 @@ func _build_home_view() -> Control:
 	actions.add_child(_make_home_eyebrow())
 	actions.add_child(_make_home_brand())
 
-	var subtitle := _make_label("PUSH BEYOND THE LIMIT", _font_px(12, 18, 0.016), Color(0.52, 0.50, 0.66, 1.0), false)
+	var subtitle := _make_label("PICK A KART · OWN THE COAST", _font_px(12, 18, 0.016), Color(0.52, 0.50, 0.66, 1.0), false)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	actions.add_child(subtitle)
 
@@ -265,15 +265,32 @@ func _build_home_view() -> Control:
 	button_gap.custom_minimum_size = Vector2(1.0, _space(24, 42))
 	actions.add_child(button_gap)
 
-	var start_button := _make_button("START RACE", true, _font_px(19, 28, 0.026), _vh(0.070, 58.0, 78.0))
+	var start_button := _make_button("RACE NOW", true, _font_px(19, 28, 0.026), _vh(0.070, 58.0, 78.0))
 	start_button.custom_minimum_size.x = _vw(0.24, 320.0, 460.0)
 	start_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	start_button.pressed.connect(Callable(self, "_show_car_select"))
 	actions.add_child(start_button)
+	var pulse := start_button.create_tween().set_loops()
+	pulse.tween_property(start_button, "modulate:v", 1.14, 0.85).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(start_button, "modulate:v", 1.0, 0.85).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	var settings_button := _make_home_settings_button()
 	settings_button.pressed.connect(Callable(self, "_toggle_settings"))
 	actions.add_child(settings_button)
+
+	var version_text := "KRITIKART v%s" % String(ProjectSettings.get_setting("application/config/version", "0"))
+	var version_label := _make_label(version_text, _font_px(9, 13, 0.011), Color(0.42, 0.42, 0.55, 0.9), false)
+	version_label.name = "VersionChip"
+	version_label.anchor_left = 1.0
+	version_label.anchor_right = 1.0
+	version_label.anchor_top = 1.0
+	version_label.anchor_bottom = 1.0
+	version_label.offset_left = -220.0
+	version_label.offset_top = -34.0
+	version_label.offset_right = -18.0
+	version_label.offset_bottom = -12.0
+	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	root.add_child(version_label)
 
 	_settings_panel = _build_settings_panel()
 	_settings_panel.visible = _settings_visible
@@ -311,6 +328,9 @@ func _make_home_background_overlay() -> Control:
 	red_core.anchor_right = 0.78
 	red_core.anchor_bottom = 0.62
 	overlay.add_child(red_core)
+	var glow_pulse := red_core.create_tween().set_loops()
+	glow_pulse.tween_property(red_core, "modulate:a", 1.55, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	glow_pulse.tween_property(red_core, "modulate:a", 0.7, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	for index: int in range(1, 16):
 		var line := ColorRect.new()
@@ -350,7 +370,7 @@ func _make_home_eyebrow() -> HBoxContainer:
 
 	for side: int in range(2):
 		if side == 1:
-			var label := _make_label("RACING SERIES", _font_px(9, 13, 0.012), COLOR_RACING_RED, false)
+			var label := _make_label("ARCADE RACING SERIES", _font_px(9, 13, 0.012), COLOR_RACING_RED, false)
 			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			row.add_child(label)
 		var line := ColorRect.new()
@@ -367,12 +387,16 @@ func _make_home_brand() -> HBoxContainer:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 0)
 
-	var summer := _make_label("SUMMER", _font_px(62, 112, 0.096), Color(0.86, 0.85, 0.86, 1.0), true)
+	var summer := _make_label("KRITI", _font_px(62, 112, 0.096), Color(0.95, 0.95, 0.96, 1.0), true)
 	summer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	summer.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.6))
+	summer.add_theme_constant_override("shadow_outline_size", 8)
 	row.add_child(summer)
 
-	var racer := _make_label("RACER", _font_px(62, 112, 0.096), COLOR_RACING_RED, true)
+	var racer := _make_label("KART", _font_px(62, 112, 0.096), Color(0.93, 0.12, 0.18, 1.0), true)
 	racer.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	racer.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.6))
+	racer.add_theme_constant_override("shadow_outline_size", 8)
 	row.add_child(racer)
 	return row
 
@@ -1979,17 +2003,17 @@ func _apply_button_style(button: Button, primary: bool) -> void:
 	var hover_font_color := Color.WHITE
 	var pressed_font_color := Color.WHITE
 	if primary:
-		normal_fill = Color(0.88, 0.88, 0.84, 0.96)
-		hover_fill = Color(1.0, 1.0, 0.96, 1.0)
-		pressed_fill = Color(0.72, 0.72, 0.68, 1.0)
-		border = Color(1.0, 1.0, 1.0, 0.62)
-		font_color = Color(0.025, 0.026, 0.030, 1.0)
-		hover_font_color = font_color
-		pressed_font_color = font_color
-	button.add_theme_stylebox_override("normal", _make_panel_style(normal_fill, border, 1, 8))
-	button.add_theme_stylebox_override("hover", _make_panel_style(hover_fill, Color(1.0, 1.0, 1.0, 0.82), 1, 8))
-	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_fill, Color(1.0, 1.0, 1.0, 0.75), 1, 8))
-	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.14, 0.14, 0.15, 0.72), Color(1.0, 1.0, 1.0, 0.12), 1, 8))
+		normal_fill = Color(0.92, 0.10, 0.16, 1.0)
+		hover_fill = Color(1.0, 0.20, 0.26, 1.0)
+		pressed_fill = Color(0.76, 0.04, 0.10, 1.0)
+		border = Color(1.0, 1.0, 1.0, 0.55)
+		font_color = Color(1.0, 1.0, 1.0, 1.0)
+		hover_font_color = Color.WHITE
+		pressed_font_color = Color.WHITE
+	button.add_theme_stylebox_override("normal", _make_panel_style(normal_fill, border, 1, 12))
+	button.add_theme_stylebox_override("hover", _make_panel_style(hover_fill, Color(1.0, 1.0, 1.0, 0.82), 2, 12))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(pressed_fill, Color(1.0, 1.0, 1.0, 0.75), 2, 12))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.14, 0.14, 0.15, 0.72), Color(1.0, 1.0, 1.0, 0.12), 1, 12))
 	var focus_border := Color(1.0, 1.0, 1.0, 0.82)
 	if primary:
 		focus_border = Color(1.0, 1.0, 1.0, 0.62)

@@ -904,16 +904,16 @@ func _shoulder_material() -> StandardMaterial3D:
 func _curb_material() -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = CURB_STRIPE_SHADER
-	material.set_shader_parameter("red_paint", Color(0.42, 0.025, 0.022, 1.0))
-	material.set_shader_parameter("white_paint", Color(0.62, 0.61, 0.55, 1.0))
+	material.set_shader_parameter("red_paint", Color(0.96, 0.16, 0.12, 1.0))
+	material.set_shader_parameter("white_paint", Color(0.98, 0.98, 0.95, 1.0))
 	material.set_shader_parameter("grime", Color(0.05, 0.045, 0.040, 1.0))
 	material.set_shader_parameter("stripe_scale", 8.0)
-	material.set_shader_parameter("grime_strength", 0.34)
+	material.set_shader_parameter("grime_strength", 0.05)
 	return material
 
 
 func _guardrail_material() -> StandardMaterial3D:
-	var material: StandardMaterial3D = _material(Color(0.56, 0.59, 0.57, 1.0), 0.34, 0.55)
+	var material: StandardMaterial3D = _material(Color(0.80, 0.83, 0.82, 1.0), 0.34, 0.10)
 	return material
 
 
@@ -921,11 +921,11 @@ func _terrain_material() -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = TERRAIN_SHADER
 	material.set_shader_parameter("terrain_albedo", TERRAIN_ALBEDO_TEXTURE)
-	material.set_shader_parameter("grass_dark", Color(0.038, 0.062, 0.041, 1.0))
-	material.set_shader_parameter("grass_sunlit", Color(0.13, 0.16, 0.082, 1.0))
-	material.set_shader_parameter("exposed_rock", Color(0.22, 0.205, 0.175, 1.0))
-	material.set_shader_parameter("dry_soil", Color(0.135, 0.105, 0.074, 1.0))
-	material.set_shader_parameter("patch_scale", 3.6)
+	material.set_shader_parameter("grass_dark", Color(0.24, 0.58, 0.22, 1.0))
+	material.set_shader_parameter("grass_sunlit", Color(0.44, 0.78, 0.28, 1.0))
+	material.set_shader_parameter("exposed_rock", Color(0.62, 0.58, 0.52, 1.0))
+	material.set_shader_parameter("dry_soil", Color(0.76, 0.62, 0.40, 1.0))
+	material.set_shader_parameter("patch_scale", 5.0)
 	material.set_shader_parameter("rock_strength", 0.68)
 	material.set_shader_parameter("soil_strength", 0.54)
 	material.set_shader_parameter("weed_strength", 0.62)

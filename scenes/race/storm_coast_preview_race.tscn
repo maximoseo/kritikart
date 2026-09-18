@@ -19,20 +19,20 @@
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_storm_coast_preview"]
 panorama = ExtResource("16_sky_panorama")
-energy_multiplier = 0.72
+energy_multiplier = 1.18
 
 [sub_resource type="Sky" id="Sky_storm_coast_preview"]
 sky_material = SubResource("PanoramaSkyMaterial_storm_coast_preview")
 
 [sub_resource type="Environment" id="Environment_storm_coast_preview"]
 background_mode = 2
-background_color = Color(0.98, 0.58, 0.32, 1)
+background_color = Color(0.62, 0.85, 1, 1)
 sky = SubResource("Sky_storm_coast_preview")
 ambient_light_source = 2
-ambient_light_color = Color(0.62, 0.66, 0.72, 1)
-ambient_light_energy = 0.44
+ambient_light_color = Color(0.72, 0.82, 0.95, 1)
+ambient_light_energy = 1.05
 tonemap_mode = 3
-tonemap_exposure = 0.62
+tonemap_exposure = 1.12
 tonemap_white = 7.5
 ssr_enabled = true
 ssr_max_steps = 48
@@ -40,25 +40,25 @@ ssao_enabled = true
 ssao_radius = 2.2
 ssao_intensity = 0.55
 glow_enabled = true
-glow_intensity = 0.12
-glow_strength = 0.276
-glow_bloom = 0.048
+glow_intensity = 0.16
+glow_strength = 0.32
+glow_bloom = 0.055
 fog_enabled = true
-fog_light_color = Color(0.82, 0.72, 0.6, 1)
-fog_light_energy = 0.09
-fog_sun_scatter = 0.32
-fog_density = 0.00115
-fog_aerial_perspective = 0.58
+fog_light_color = Color(0.88, 0.93, 1, 1)
+fog_light_energy = 0.16
+fog_sun_scatter = 0.22
+fog_density = 0.0006
+fog_aerial_perspective = 0.36
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.0072
-volumetric_fog_albedo = Color(0.72, 0.7, 0.66, 1)
-volumetric_fog_emission = Color(0.78, 0.46, 0.24, 1)
-volumetric_fog_emission_energy = 0.012
+volumetric_fog_density = 0.0035
+volumetric_fog_albedo = Color(0.86, 0.92, 1, 1)
+volumetric_fog_emission = Color(0.9, 0.95, 1, 1)
+volumetric_fog_emission_energy = 0.006
 volumetric_fog_length = 220.0
 volumetric_fog_sky_affect = 0.276
 adjustment_enabled = true
-adjustment_contrast = 1.03
-adjustment_saturation = 1.08
+adjustment_contrast = 1.07
+adjustment_saturation = 1.38
 
 [node name="StormCoastPreviewRace" type="Node3D" unique_id=1039963252]
 script = ExtResource("1_scene")
