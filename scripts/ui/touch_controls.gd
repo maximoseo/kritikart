@@ -167,37 +167,56 @@ func _layout_buttons() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
 	var short_side := minf(viewport_size.x, viewport_size.y)
 	var pad_scale: float = clampf(short_side / 1080.0, 0.55, 1.35)
-	var margin := 40.0 * pad_scale
-	var steer_size := 196.0 * pad_scale
-	var pedal_big := 232.0 * pad_scale
-	var pedal_small := 168.0 * pad_scale
-	var utility_size := 92.0 * pad_scale
+	var insets := _safe_area_insets()
+	var margin_left := 40.0 * pad_scale + float(insets.x)
+	var margin_right := 40.0 * pad_scale + float(insets.z)
+	var margin_top := 40.0 * pad_scale + float(insets.y)
+	var margin_bottom := 40.0 * pad_scale + float(insets.w)
+	var steer_size := maxf(196.0 * pad_scale, 48.0)
+	var pedal_big := maxf(232.0 * pad_scale, 48.0)
+	var pedal_small := maxf(168.0 * pad_scale, 48.0)
+	var utility_size := maxf(92.0 * pad_scale, 48.0)
 
 	for button in _buttons:
 		var pad := button as VirtualPadButton
 		match String(pad.name):
 			"SteerLeft":
 				pad.size = Vector2(steer_size, steer_size)
-				pad.position = Vector2(margin, viewport_size.y - steer_size - margin)
+				pad.position = Vector2(margin_left, viewport_size.y - steer_size - margin_bottom)
 			"SteerRight":
 				pad.size = Vector2(steer_size, steer_size)
-				pad.position = Vector2(margin + steer_size + 22.0 * pad_scale, viewport_size.y - steer_size - margin)
+				pad.position = Vector2(margin_left + steer_size + 22.0 * pad_scale, viewport_size.y - steer_size - margin_bottom)
 			"Gas":
 				pad.size = Vector2(pedal_big, pedal_big)
-				pad.position = Vector2(viewport_size.x - pedal_big - margin, viewport_size.y - pedal_big - margin)
+				pad.position = Vector2(viewport_size.x - pedal_big - margin_right, viewport_size.y - pedal_big - margin_bottom)
 			"Brake":
 				pad.size = Vector2(pedal_small, pedal_small)
-				pad.position = Vector2(viewport_size.x - pedal_big - margin - pedal_small - 26.0 * pad_scale, viewport_size.y - pedal_small - margin)
+				pad.position = Vector2(viewport_size.x - pedal_big - margin_right - pedal_small - 26.0 * pad_scale, viewport_size.y - pedal_small - margin_bottom)
 			"Drift":
 				pad.size = Vector2(pedal_small, pedal_small)
-				pad.position = Vector2(viewport_size.x - pedal_small - 30.0 * pad_scale, viewport_size.y - pedal_big - margin - pedal_small - 20.0 * pad_scale)
+				pad.position = Vector2(viewport_size.x - pedal_small - margin_right - 30.0 * pad_scale, viewport_size.y - pedal_big - margin_bottom - pedal_small - 20.0 * pad_scale)
 			"Camera":
 				pad.size = Vector2(utility_size, utility_size)
-				pad.position = Vector2(viewport_size.x - utility_size - margin, margin)
+				pad.position = Vector2(viewport_size.x - utility_size - margin_right, margin_top)
 			"Pause":
 				pad.size = Vector2(utility_size, utility_size)
-				pad.position = Vector2(viewport_size.x - utility_size * 2.0 - margin - 16.0 * pad_scale, margin)
+				pad.position = Vector2(viewport_size.x - utility_size * 2.0 - margin_right - 16.0 * pad_scale, margin_top)
 		pad.queue_redraw()
+
+
+func _safe_area_insets() -> Vector4i:
+	## Returns left, top, right, bottom inset pixels from DisplayServer safe area.
+	var screen_size: Vector2i = DisplayServer.window_get_size()
+	if screen_size.x <= 0 or screen_size.y <= 0:
+		return Vector4i(0, 0, 0, 0)
+	var safe: Rect2i = DisplayServer.get_display_safe_area()
+	if safe.size.x <= 0 or safe.size.y <= 0:
+		return Vector4i(0, 0, 0, 0)
+	var left: int = maxi(safe.position.x, 0)
+	var top: int = maxi(safe.position.y, 0)
+	var right: int = maxi(screen_size.x - (safe.position.x + safe.size.x), 0)
+	var bottom: int = maxi(screen_size.y - (safe.position.y + safe.size.y), 0)
+	return Vector4i(left, top, right, bottom)
 
 
 class VirtualPadButton:

@@ -754,7 +754,37 @@ func _show_results_screen(results: Array) -> void:
 		_results_laps_value_label.text = _laps_text(player_row)
 
 	_populate_standings(rows)
+	_apply_progression_notes(player_row, placement)
 	_results_root.visible = true
+
+
+func _apply_progression_notes(player_row: Dictionary, placement: int) -> void:
+	var session := get_node_or_null("/root/GameSession")
+	if session == null or not session.has_method("record_race_finished"):
+		return
+	var race_time_ms := int(player_row.get("total_time_msec", 0))
+	if race_time_ms <= 0 and _race_manager != null and _race_manager.has_method("get_race_time_msec"):
+		var value: Variant = _race_manager.call("get_race_time_msec")
+		if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
+			race_time_ms = int(value)
+	var notes: Dictionary = session.call("record_race_finished", placement, race_time_ms)
+	var unlock_note := str(notes.get("unlock_note", ""))
+	var streak_note := str(notes.get("streak_note", ""))
+	var combined := ""
+	if unlock_note != "":
+		combined = unlock_note
+	if streak_note != "":
+		combined = streak_note if combined == "" else "%s · %s" % [combined, streak_note]
+	if combined == "":
+		return
+	if _results_title_label != null and unlock_note != "":
+		_results_title_label.text = "UNLOCKED"
+	# Append a one-line caption under standings when available.
+	if _results_standings_list != null:
+		var note_label := _make_result_label(combined, _overlay_font_px(13, 20, 0.017), Color(0.0, 1.0, 0.48, 1.0), true, HORIZONTAL_ALIGNMENT_CENTER)
+		note_label.name = "ProgressionNote"
+		note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_results_standings_list.add_child(note_label)
 
 
 func _result_rows(results: Array) -> Array[Dictionary]:

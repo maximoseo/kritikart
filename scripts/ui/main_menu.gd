@@ -783,6 +783,18 @@ func _build_track_info_rail() -> Control:
 	_race_now_button = _make_button("RACE NOW", true, _font_px(12, 18, 0.017), _vh(0.054, 42.0, 58.0))
 	_race_now_button.pressed.connect(Callable(self, "_start_race_loading"))
 	bottom_stack.add_child(_race_now_button)
+	var daily_button := _make_button("DAILY CHALLENGE", false, _font_px(11, 16, 0.015), _vh(0.048, 40.0, 54.0))
+	daily_button.name = "DailyChallengeButton"
+	daily_button.pressed.connect(Callable(self, "_start_daily_challenge"))
+	var session_for_daily := _session()
+	if session_for_daily != null and session_for_daily.has_method("get_daily_challenge"):
+		var challenge: Dictionary = session_for_daily.call("get_daily_challenge")
+		daily_button.tooltip_text = str(challenge.get("blurb", "Play today's seeded challenge"))
+		var streak := int(session_for_daily.get("daily_streak")) if "daily_streak" in session_for_daily else 0
+		if streak > 0:
+			daily_button.text = "DAILY · STREAK %d" % streak
+	bottom_stack.add_child(daily_button)
+	_maybe_show_onboarding_hints(bottom_stack)
 	return rail
 
 
@@ -2219,10 +2231,43 @@ func _start_race_loading() -> void:
 		_sync_track_start_state()
 		return
 	var session := _session()
+	if session != null and session.has_method("clear_daily_mode"):
+		session.call("clear_daily_mode")
+	if session != null and session.has_method("unlock_web_audio_if_needed"):
+		session.call("unlock_web_audio_if_needed")
 	if session != null and session.has_method("prepare_race_loading"):
 		session.call("prepare_race_loading")
 	_stop_menu_audio(0.25)
 	get_tree().change_scene_to_file(RACE_LOADING_SCENE_PATH)
+
+
+func _start_daily_challenge() -> void:
+	var session := _session()
+	if session == null or not session.has_method("begin_daily_challenge"):
+		return
+	if session.has_method("unlock_web_audio_if_needed"):
+		session.call("unlock_web_audio_if_needed")
+	if not bool(session.call("begin_daily_challenge")):
+		return
+	if session.has_method("prepare_race_loading"):
+		session.call("prepare_race_loading")
+	_stop_menu_audio(0.25)
+	get_tree().change_scene_to_file(RACE_LOADING_SCENE_PATH)
+
+
+func _maybe_show_onboarding_hints(parent: Control) -> void:
+	var session := _session()
+	if session == null:
+		return
+	if bool(session.get("onboarding_hints_seen")):
+		return
+	var hint := _make_label("Tip: steer with A/D or thumb pads · hold Drift into corners · tap Race Now", _font_px(11, 15, 0.013), COLOR_TEXT_MUTED, false)
+	hint.name = "OnboardingHint"
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.modulate = Color(1, 1, 1, 0.92)
+	parent.add_child(hint)
+	if session.has_method("mark_onboarding_hints_seen"):
+		session.call("mark_onboarding_hints_seen")
 
 
 func _on_master_percent_changed(value: float) -> void:
