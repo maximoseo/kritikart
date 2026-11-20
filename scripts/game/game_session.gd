@@ -4,6 +4,7 @@ signal selections_changed
 signal settings_changed
 
 const RaceConfigScript := preload("res://scripts/race/race_config.gd")
+const DailyChallengeScript := preload("res://scripts/game/daily_challenge.gd")
 
 const DEFAULT_CAR_ID: StringName = &"vanta_r49"
 const DEFAULT_SKIN_ID: StringName = &"vanta_r49_midnight"
@@ -219,6 +220,14 @@ var _pending_loading_target: String = DEFAULT_TRACK_SCENE_PATH
 var _preloaded_resources: Dictionary = {}
 var _brightness_overlay_layer: CanvasLayer = null
 var _brightness_overlay_rect: ColorRect = null
+var daily_mode_active: bool = false
+var onboarding_hints_seen: bool = false
+var daily_streak: int = 0
+var daily_last_completed_day: String = ""
+var daily_personal_best_ms: int = 0
+var unlocked_skin_ids: Array[String] = []
+var races_finished_count: int = 0
+var _web_audio_unlocked: bool = false
 
 
 func _ready() -> void:
@@ -229,6 +238,93 @@ func _ready() -> void:
 	apply_audio_settings()
 	_ensure_brightness_overlay()
 	_apply_brightness_overlay()
+	if not get_viewport().gui_focus_changed.is_connected(Callable(self, "_on_gui_focus_changed_unlock_audio")):
+		get_viewport().gui_focus_changed.connect(Callable(self, "_on_gui_focus_changed_unlock_audio"))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_save_settings()
+	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		# Android hardware back → leave pause handling to race overlay; still persist.
+		_save_settings()
+
+
+func _on_gui_focus_changed_unlock_audio(_control: Control) -> void:
+	unlock_web_audio_if_needed()
+
+
+func unlock_web_audio_if_needed() -> void:
+	if _web_audio_unlocked:
+		return
+	_web_audio_unlocked = true
+	apply_audio_settings()
+
+
+func get_daily_challenge() -> Dictionary:
+	return DailyChallengeScript.challenge_for_day()
+
+
+func begin_daily_challenge() -> bool:
+	var challenge: Dictionary = get_daily_challenge()
+	var track_id: StringName = challenge.get("track_id", DEFAULT_TRACK_ID)
+	var difficulty: String = str(challenge.get("difficulty", "medium"))
+	set_track(track_id)
+	set_difficulty(difficulty)
+	daily_mode_active = true
+	_save_settings()
+	return true
+
+
+func clear_daily_mode() -> void:
+	if not daily_mode_active:
+		return
+	daily_mode_active = false
+	_save_settings()
+
+
+func mark_onboarding_hints_seen() -> void:
+	if onboarding_hints_seen:
+		return
+	onboarding_hints_seen = true
+	_save_settings()
+
+
+func record_race_finished(player_placement: int, race_time_ms: int = 0) -> Dictionary:
+	races_finished_count += 1
+	var unlock_note: String = ""
+	if races_finished_count == 1 and not unlocked_skin_ids.has("vanta_r49_crimson"):
+		unlocked_skin_ids.append("vanta_r49_crimson")
+		unlock_note = "Unlocked skin: Crimson Graphite"
+	elif races_finished_count == 3 and not unlocked_skin_ids.has("astra_r50_solar"):
+		unlocked_skin_ids.append("astra_r50_solar")
+		unlock_note = "Unlocked skin: Solar White"
+
+	var streak_note: String = ""
+	if daily_mode_active:
+		var today: String = DailyChallengeScript.utc_day_key()
+		if daily_last_completed_day != today:
+			if daily_last_completed_day != "":
+				var yesterday: String = DailyChallengeScript.utc_day_key(int(Time.get_unix_time_from_system()) - 86400)
+				if daily_last_completed_day == yesterday:
+					daily_streak += 1
+				else:
+					daily_streak = 1
+			else:
+				daily_streak = 1
+			daily_last_completed_day = today
+		if race_time_ms > 0 and (daily_personal_best_ms <= 0 or race_time_ms < daily_personal_best_ms):
+			daily_personal_best_ms = race_time_ms
+		streak_note = "Daily streak: %d" % daily_streak
+		daily_mode_active = false
+
+	_save_settings()
+	return {
+		"unlock_note": unlock_note,
+		"streak_note": streak_note,
+		"placement": player_placement,
+		"streak": daily_streak,
+	}
 
 
 func _apply_minimum_window_size() -> void:
@@ -923,6 +1019,19 @@ func _load_settings() -> void:
 	music_volume = float(config.get_value("audio", "music_volume", music_volume))
 	sfx_volume = float(config.get_value("audio", "sfx_volume", sfx_volume))
 	brightness = float(config.get_value("display", "brightness", brightness))
+	onboarding_hints_seen = bool(config.get_value("progress", "onboarding_hints_seen", onboarding_hints_seen))
+	daily_streak = int(config.get_value("progress", "daily_streak", daily_streak))
+	daily_last_completed_day = str(config.get_value("progress", "daily_last_completed_day", daily_last_completed_day))
+	daily_personal_best_ms = int(config.get_value("progress", "daily_personal_best_ms", daily_personal_best_ms))
+	races_finished_count = int(config.get_value("progress", "races_finished_count", races_finished_count))
+	var unlocked_variant: Variant = config.get_value("progress", "unlocked_skin_ids", unlocked_skin_ids)
+	unlocked_skin_ids.clear()
+	if unlocked_variant is PackedStringArray:
+		for skin_id in unlocked_variant:
+			unlocked_skin_ids.append(str(skin_id))
+	elif unlocked_variant is Array:
+		for skin_id in unlocked_variant:
+			unlocked_skin_ids.append(str(skin_id))
 
 
 func _save_settings() -> void:
@@ -937,6 +1046,12 @@ func _save_settings() -> void:
 	config.set_value("audio", "music_volume", music_volume)
 	config.set_value("audio", "sfx_volume", sfx_volume)
 	config.set_value("display", "brightness", brightness)
+	config.set_value("progress", "onboarding_hints_seen", onboarding_hints_seen)
+	config.set_value("progress", "daily_streak", daily_streak)
+	config.set_value("progress", "daily_last_completed_day", daily_last_completed_day)
+	config.set_value("progress", "daily_personal_best_ms", daily_personal_best_ms)
+	config.set_value("progress", "races_finished_count", races_finished_count)
+	config.set_value("progress", "unlocked_skin_ids", PackedStringArray(unlocked_skin_ids))
 	config.save(SETTINGS_PATH)
 
 
