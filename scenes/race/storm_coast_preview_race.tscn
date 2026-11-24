@@ -77,9 +77,8 @@ metadata/last_authoring_record_counts = {
 }
 
 [node name="CoastalBackdrop" type="Node3D" parent="World" unique_id=679288389]
-visible = false
 script = ExtResource("8_backdrop")
-generate_on_ready = false
+generate_on_ready = true
 horizon_distance_m = 920.0
 backdrop_width_m = 2100.0
 ocean_height_m = -22.0
@@ -90,10 +89,9 @@ city_color = Color(0.72, 0.76, 0.74, 1)
 cloud_color = Color(1, 0.78, 0.58, 0.22)
 
 [node name="PremiumCoastalDressing" type="Node3D" parent="World" unique_id=2083054617]
-visible = false
 script = ExtResource("9_premium")
 style = "coastal_mountain"
-generate_on_ready = false
+generate_on_ready = true
 sponsor_texture_paths = PackedStringArray("res://assets/track/sponsors/sponsor_volt_racing.png", "res://assets/track/sponsors/sponsor_apex_energy.png", "res://assets/track/sponsors/sponsor_gripforge.png", "res://assets/track/sponsors/sponsor_neon_vector.png")
 reflector_post_count = 16
 cliff_cluster_count = 22

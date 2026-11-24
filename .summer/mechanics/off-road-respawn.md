@@ -5,8 +5,8 @@
 **Response:** While the car is inside the road width, the race scene records the nearest track distance. If the car stays outside the road margin for a short grace period, or falls below the road surface, it respawns centered on the last valid road distance and faces forward along the track.
 
 **Feedback:**
-- Visual: immediate reposition onto the road center. Future polish should add a short fade or ghost effect.
-- Audio: none yet. Future polish should add a quick recovery sting.
+- Visual: immediate reposition onto the road center, covered by a short fade-from-black (`respawn_fade_*` exports on the race scene) so the teleport never pops.
+- Audio: a quick recovery sting plays on respawn (`respawn_sting_stream`), and the scene emits `player_respawned(reason)` for HUD/VFX hooks.
 - Mechanical: velocity resets to zero so the car does not carry bad launch/off-road momentum into the respawn.
 
 **Failure modes:**

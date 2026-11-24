@@ -56,6 +56,8 @@ var _gear_panel: Control = null
 var _gear_label: Label = null
 var _rpm_container: HBoxContainer = null
 var _rpm_blocks: Array[ColorRect] = []
+var _boost_bar_bg: ColorRect = null
+var _boost_bar_fill: ColorRect = null
 var _last_overlay_viewport_size: Vector2 = Vector2.ZERO
 
 
@@ -93,6 +95,7 @@ func _update_hud() -> void:
 		_set_label_text(_time_label, _strip_prefix(time_text, "Time ").to_upper())
 		_set_label_text(_gear_label, str(_gear_for_readout(speed_kmh)))
 		_update_rpm_blocks(_rpm_for_speed(speed_kmh))
+		_update_boost_bar()
 	else:
 		_set_label_text(_speed_label, "Speed %03d km/h" % speed_kmh)
 		_set_label_text(_lap_label, lap_text)
@@ -192,6 +195,28 @@ func _ensure_default_camera_overlay() -> void:
 		block.custom_minimum_size = Vector2(8.0, 13.0)
 		_rpm_blocks.append(block)
 		_rpm_container.add_child(block)
+
+	var boost_row := HBoxContainer.new()
+	boost_row.name = "BoostRow"
+	boost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boost_row.alignment = BoxContainer.ALIGNMENT_END
+	boost_row.add_theme_constant_override("separation", 6)
+	speed_root.add_child(boost_row)
+	boost_row.add_child(_make_overlay_label("BoostCaption", "BOOST", 10, Color(0.29, 0.29, 0.42, 1.0), HORIZONTAL_ALIGNMENT_RIGHT))
+	_boost_bar_bg = ColorRect.new()
+	_boost_bar_bg.name = "BoostBarBg"
+	_boost_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boost_bar_bg.custom_minimum_size = Vector2(150.0, 8.0)
+	_boost_bar_bg.color = Color(1.0, 1.0, 1.0, 0.14)
+	_boost_bar_bg.clip_contents = true
+	boost_row.add_child(_boost_bar_bg)
+	_boost_bar_fill = ColorRect.new()
+	_boost_bar_fill.name = "BoostBarFill"
+	_boost_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boost_bar_fill.color = Color(0.30, 0.85, 1.0, 0.95)
+	_boost_bar_fill.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_boost_bar_bg.add_child(_boost_bar_fill)
+	_boost_bar_bg.visible = false
 
 	var speed_row := HBoxContainer.new()
 	speed_row.name = "SpeedRow"
@@ -682,6 +707,27 @@ func _rpm_for_speed(speed_kmh: int) -> float:
 		if throttle_value is float or throttle_value is int:
 			throttle = clampf(float(throttle_value), 0.0, 1.0)
 	return clampf(gear_progress * 0.76 + throttle * 0.24, 0.0, 1.0)
+
+
+func _update_boost_bar() -> void:
+	if _boost_bar_bg == null or _boost_bar_fill == null:
+		return
+	var charge_ratio: float = 0.0
+	var boost_active: bool = false
+	if _player_car != null:
+		if _player_car.has_method("get_drift_charge_ratio"):
+			var ratio_value: Variant = _player_car.call("get_drift_charge_ratio")
+			if ratio_value is float or ratio_value is int:
+				charge_ratio = clampf(float(ratio_value), 0.0, 1.0)
+		if _player_car.has_method("is_drift_boost_active"):
+			boost_active = bool(_player_car.call("is_drift_boost_active"))
+	_boost_bar_bg.visible = boost_active or charge_ratio > 0.01
+	if boost_active:
+		_boost_bar_fill.color = Color(1.0, 0.55, 0.15, 1.0)
+		_boost_bar_fill.anchor_right = 1.0
+	else:
+		_boost_bar_fill.color = Color(0.30, 0.85, 1.0, 0.95)
+		_boost_bar_fill.anchor_right = charge_ratio
 
 
 func _update_rpm_blocks(rpm: float) -> void:

@@ -8,6 +8,8 @@ const KMH_TO_MPS: float = 1.0 / 3.6
 signal drift_started(intensity: float)
 signal drift_ended
 signal drift_intensity_changed(intensity: float)
+signal drift_boost_started
+signal drift_boost_ended
 signal wall_scraped(intensity: float, contact_position: Vector3, contact_normal: Vector3)
 signal vehicle_bumped(intensity: float, contact_position: Vector3, contact_normal: Vector3)
 
@@ -60,6 +62,11 @@ signal vehicle_bumped(intensity: float, contact_position: Vector3, contact_norma
 @export var drift_steering_gain: float = 0.75
 @export var drift_drag: float = 10.0
 @export_range(0.25, 1.0, 0.01) var drift_speed_cap_ratio: float = 1.0
+@export var drift_boost_enabled: bool = true
+@export_range(0.1, 3.0, 0.05) var drift_boost_charge_time_s: float = 0.7
+@export_range(0.1, 3.0, 0.05) var drift_boost_duration_s: float = 0.85
+@export var drift_boost_acceleration: float = 38.0
+@export_range(0.0, 0.5, 0.01) var drift_boost_speed_bonus_ratio: float = 0.10
 
 @export_category("Collision Feel")
 @export_range(0.0, 1.0, 0.01) var wall_glance_speed_retention: float = 0.74
@@ -166,6 +173,9 @@ var _current_gear: int = 1
 var _shift_cooldown: float = 0.0
 var _was_drifting: bool = false
 var _last_reported_drift_intensity: float = 0.0
+var _drift_charge_s: float = 0.0
+var _drift_boost_time_remaining_s: float = 0.0
+var _boost_prev_drifting: bool = false
 var _wall_scrape_cooldown: float = 0.0
 var _vehicle_bump_cooldown: float = 0.0
 var _visual_steer_amount: float = 0.0
@@ -291,6 +301,16 @@ func get_steering_input() -> float:
 
 func get_drift_intensity() -> float:
 	return drift_intensity if _is_finite_float(drift_intensity) else 0.0
+
+
+func is_drift_boost_active() -> bool:
+	return _drift_boost_time_remaining_s > 0.0
+
+
+func get_drift_charge_ratio() -> float:
+	if drift_boost_charge_time_s <= 0.0:
+		return 0.0
+	return clampf(_drift_charge_s / drift_boost_charge_time_s, 0.0, 1.0)
 
 
 func are_controls_enabled() -> bool:
@@ -419,6 +439,7 @@ func _update_planar_velocity(delta: float) -> void:
 	steer_amount = effective_steer_amount
 
 	is_drifting = _drift_input_active and _forward_speed >= drift_min_speed
+	_update_drift_boost(delta)
 	if is_drifting:
 		var drift_speed_range: float = maxf(max_speed - drift_min_speed, 1.0)
 		var drift_speed_ratio: float = clampf((_forward_speed - drift_min_speed) / drift_speed_range, 0.0, 1.0)
@@ -443,7 +464,12 @@ func _update_planar_velocity(delta: float) -> void:
 	right = _flat_right()
 
 	if throttle_amount > 0.0:
-		_forward_speed = move_toward(_forward_speed, current_gear_speed_limit, acceleration * throttle_amount * delta)
+		var accel_rate: float = acceleration
+		var target_speed: float = current_gear_speed_limit
+		if is_drift_boost_active():
+			accel_rate += maxf(_finite_or(drift_boost_acceleration, 0.0), 0.0)
+			target_speed *= 1.0 + clampf(_finite_or(drift_boost_speed_bonus_ratio, 0.0), 0.0, 0.5)
+		_forward_speed = move_toward(_forward_speed, target_speed, accel_rate * throttle_amount * delta)
 	elif brake_amount > 0.0:
 		if _forward_speed > 2.0:
 			_forward_speed = move_toward(_forward_speed, 0.0, brake_force * brake_amount * delta)
@@ -554,8 +580,26 @@ func _gear_speed_limit(gear: int) -> float:
 	return maxf(max_speed, 1.0) * (float(clamped_gear) / float(safe_gear_count))
 
 
+func _update_drift_boost(delta: float) -> void:
+	var drift_just_ended: bool = _boost_prev_drifting and not is_drifting
+	_boost_prev_drifting = is_drifting
+	if is_drifting:
+		_drift_charge_s += delta
+	elif drift_just_ended:
+		if drift_boost_enabled and _drift_charge_s >= maxf(drift_boost_charge_time_s, 0.01):
+			_drift_boost_time_remaining_s = maxf(drift_boost_duration_s, 0.05)
+			drift_boost_started.emit()
+		_drift_charge_s = 0.0
+	if _drift_boost_time_remaining_s > 0.0:
+		_drift_boost_time_remaining_s = maxf(0.0, _drift_boost_time_remaining_s - delta)
+		if _drift_boost_time_remaining_s <= 0.0:
+			drift_boost_ended.emit()
+
+
 func _planar_speed_cap(current_gear_speed_limit: float) -> float:
 	var safe_cap: float = maxf(minf(current_gear_speed_limit, maxf(_finite_or(max_speed, 1.0), 1.0)), 1.0)
+	if is_drift_boost_active():
+		safe_cap *= 1.0 + clampf(_finite_or(drift_boost_speed_bonus_ratio, 0.0), 0.0, 0.5)
 	if _forward_speed < 0.0:
 		safe_cap = maxf(_finite_or(reverse_speed, 1.0), 1.0)
 	if is_drifting:

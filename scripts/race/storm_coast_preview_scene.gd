@@ -1,6 +1,8 @@
 class_name StormCoastPreviewScene
 extends Node3D
 
+signal player_respawned(reason: String)
+
 const RaceConfigScript := preload("res://scripts/race/race_config.gd")
 
 @export_node_path("Node") var track_generator_path: NodePath = ^"World/TrackAuthoring/Generated/StormCoastTrackGenerator"
@@ -27,6 +29,13 @@ const RaceConfigScript := preload("res://scripts/race/race_config.gd")
 @export_range(-0.5, 1.5, 0.05) var respawn_vertical_offset_m: float = -0.08
 @export var print_respawn_events: bool = false
 
+@export_category("Respawn Feedback")
+@export var respawn_fade_enabled: bool = true
+@export_range(0.05, 1.5, 0.05) var respawn_fade_in_s: float = 0.45
+@export_range(0.0, 1.0, 0.05) var respawn_fade_peak_alpha: float = 0.85
+@export var respawn_sting_stream: AudioStream = preload("res://assets/audio/sfx/countdown_start_stinger.mp3")
+@export var respawn_sting_volume_db: float = -6.0
+
 var _track_generator: Node = null
 var _track_query: RefCounted = null
 var _player_car: Node3D = null
@@ -36,6 +45,9 @@ var _race_manager: Node = null
 var _last_valid_track_distance_m: float = 0.0
 var _offroad_time_s: float = 0.0
 var _track_safety_poll_accumulator_s: float = 0.0
+var _respawn_fade_rect: ColorRect = null
+var _respawn_fade_tween: Tween = null
+var _respawn_sting_player: AudioStreamPlayer = null
 
 
 func _ready() -> void:
@@ -376,9 +388,42 @@ func _respawn_player_on_track(fell_below_track: bool) -> void:
 	_player_car.global_transform = respawn_transform
 	_reset_vehicle_motion(_player_car)
 	_offroad_time_s = 0.0
+	var reason: String = "fell" if fell_below_track else "offroad"
+	player_respawned.emit(reason)
+	_play_respawn_feedback()
 	if print_respawn_events:
-		var reason: String = "fell" if fell_below_track else "offroad"
 		print("StormCoastTrackSafety: respawned player reason=%s distance_m=%.1f" % [reason, _last_valid_track_distance_m])
+
+
+func _play_respawn_feedback() -> void:
+	if respawn_sting_stream != null:
+		if _respawn_sting_player == null:
+			_respawn_sting_player = AudioStreamPlayer.new()
+			_respawn_sting_player.name = "RespawnSting"
+			_respawn_sting_player.bus = &"SFX"
+			add_child(_respawn_sting_player)
+		_respawn_sting_player.stream = respawn_sting_stream
+		_respawn_sting_player.volume_db = respawn_sting_volume_db
+		_respawn_sting_player.stop()
+		_respawn_sting_player.play()
+	if not respawn_fade_enabled:
+		return
+	if _respawn_fade_rect == null:
+		var layer := CanvasLayer.new()
+		layer.name = "RespawnFadeLayer"
+		layer.layer = 90
+		add_child(layer)
+		_respawn_fade_rect = ColorRect.new()
+		_respawn_fade_rect.name = "RespawnFade"
+		_respawn_fade_rect.color = Color(0, 0, 0, 0)
+		_respawn_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_respawn_fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		layer.add_child(_respawn_fade_rect)
+	if _respawn_fade_tween != null:
+		_respawn_fade_tween.kill()
+	_respawn_fade_rect.color = Color(0, 0, 0, clampf(respawn_fade_peak_alpha, 0.0, 1.0))
+	_respawn_fade_tween = create_tween()
+	_respawn_fade_tween.tween_property(_respawn_fade_rect, "color:a", 0.0, maxf(respawn_fade_in_s, 0.05))
 
 
 func _print_setup_summary() -> void:
