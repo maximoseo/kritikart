@@ -10,6 +10,8 @@ signal drift_ended
 signal drift_intensity_changed(intensity: float)
 signal drift_boost_started
 signal drift_boost_ended
+signal slipstream_started
+signal slipstream_ended
 signal wall_scraped(intensity: float, contact_position: Vector3, contact_normal: Vector3)
 signal vehicle_bumped(intensity: float, contact_position: Vector3, contact_normal: Vector3)
 
@@ -67,6 +69,15 @@ signal vehicle_bumped(intensity: float, contact_position: Vector3, contact_norma
 @export_range(0.1, 3.0, 0.05) var drift_boost_duration_s: float = 0.85
 @export var drift_boost_acceleration: float = 38.0
 @export_range(0.0, 0.5, 0.01) var drift_boost_speed_bonus_ratio: float = 0.10
+
+@export_category("Slipstream")
+@export var slipstream_enabled: bool = true
+@export_range(4.0, 30.0, 0.5) var slipstream_range_m: float = 14.0
+@export_range(0.5, 5.0, 0.1) var slipstream_width_m: float = 2.4
+@export_range(0.0, 40.0, 1.0) var slipstream_min_speed: float = 14.0
+@export var slipstream_acceleration: float = 26.0
+@export_range(0.0, 0.5, 0.01) var slipstream_speed_bonus_ratio: float = 0.06
+@export_range(1.0, 30.0, 1.0) var slipstream_poll_hz: float = 12.0
 
 @export_category("Collision Feel")
 @export_range(0.0, 1.0, 0.01) var wall_glance_speed_retention: float = 0.74
@@ -176,6 +187,10 @@ var _last_reported_drift_intensity: float = 0.0
 var _drift_charge_s: float = 0.0
 var _drift_boost_time_remaining_s: float = 0.0
 var _boost_prev_drifting: bool = false
+var is_slipstreaming: bool = false
+var _slipstream_poll_accumulator_s: float = 0.0
+var _was_slipstreaming: bool = false
+var _gameplay_core: Node = null
 var _wall_scrape_cooldown: float = 0.0
 var _vehicle_bump_cooldown: float = 0.0
 var _visual_steer_amount: float = 0.0
@@ -186,6 +201,13 @@ var _surface_up: Vector3 = Vector3.UP
 
 
 func _ready() -> void:
+	add_to_group("kart_vehicles")
+	_gameplay_core = _create_gameplay_core()
+	if _gameplay_core != null:
+		if _gameplay_core.has_signal("DriftBoostStarted"):
+			_gameplay_core.connect("DriftBoostStarted", func() -> void: drift_boost_started.emit())
+		if _gameplay_core.has_signal("DriftBoostEnded"):
+			_gameplay_core.connect("DriftBoostEnded", func() -> void: drift_boost_ended.emit())
 	_sync_character_body_grounding_settings()
 	_current_gear = clampi(starting_gear, 1, maxi(gear_count, 1))
 	_resolve_driver()
@@ -304,10 +326,14 @@ func get_drift_intensity() -> float:
 
 
 func is_drift_boost_active() -> bool:
+	if _gameplay_core != null:
+		return bool(_gameplay_core.get("BoostActive"))
 	return _drift_boost_time_remaining_s > 0.0
 
 
 func get_drift_charge_ratio() -> float:
+	if _gameplay_core != null:
+		return clampf(float(_gameplay_core.get("ChargeRatio")), 0.0, 1.0)
 	if drift_boost_charge_time_s <= 0.0:
 		return 0.0
 	return clampf(_drift_charge_s / drift_boost_charge_time_s, 0.0, 1.0)
@@ -440,6 +466,7 @@ func _update_planar_velocity(delta: float) -> void:
 
 	is_drifting = _drift_input_active and _forward_speed >= drift_min_speed
 	_update_drift_boost(delta)
+	_update_slipstream(delta)
 	if is_drifting:
 		var drift_speed_range: float = maxf(max_speed - drift_min_speed, 1.0)
 		var drift_speed_ratio: float = clampf((_forward_speed - drift_min_speed) / drift_speed_range, 0.0, 1.0)
@@ -469,6 +496,9 @@ func _update_planar_velocity(delta: float) -> void:
 		if is_drift_boost_active():
 			accel_rate += maxf(_finite_or(drift_boost_acceleration, 0.0), 0.0)
 			target_speed *= 1.0 + clampf(_finite_or(drift_boost_speed_bonus_ratio, 0.0), 0.0, 0.5)
+		if is_slipstreaming:
+			accel_rate += maxf(_finite_or(slipstream_acceleration, 0.0), 0.0)
+			target_speed *= 1.0 + clampf(_finite_or(slipstream_speed_bonus_ratio, 0.0), 0.0, 0.5)
 		_forward_speed = move_toward(_forward_speed, target_speed, accel_rate * throttle_amount * delta)
 	elif brake_amount > 0.0:
 		if _forward_speed > 2.0:
@@ -580,7 +610,28 @@ func _gear_speed_limit(gear: int) -> float:
 	return maxf(max_speed, 1.0) * (float(clamped_gear) / float(safe_gear_count))
 
 
+func _create_gameplay_core() -> Node:
+	# C# is optional: on non-.NET builds the class does not exist and the
+	# GDScript state machine below runs instead. Never load the .cs resource
+	# unless the runtime actually provides CSharpScript.
+	if not ClassDB.class_exists(&"CSharpScript"):
+		return null
+	var cs_script: Resource = load("res://scripts/cs/KartGameplayCore.cs")
+	if cs_script == null or not cs_script.has_method("can_instantiate") or not bool(cs_script.call("can_instantiate")):
+		return null
+	var core := Node.new()
+	core.name = "KartGameplayCore"
+	core.set_script(cs_script)
+	add_child(core)
+	return core
+
+
 func _update_drift_boost(delta: float) -> void:
+	if _gameplay_core != null:
+		# C# core owns the boost state machine; GDScript mirrors its signals.
+		_gameplay_core.call("UpdateBoost", delta, is_drifting)
+		_boost_prev_drifting = is_drifting
+		return
 	var drift_just_ended: bool = _boost_prev_drifting and not is_drifting
 	_boost_prev_drifting = is_drifting
 	if is_drifting:
@@ -596,10 +647,42 @@ func _update_drift_boost(delta: float) -> void:
 			drift_boost_ended.emit()
 
 
+func _update_slipstream(delta: float) -> void:
+	_slipstream_poll_accumulator_s += delta
+	var poll_interval: float = 1.0 / maxf(slipstream_poll_hz, 1.0)
+	if _slipstream_poll_accumulator_s < poll_interval:
+		return
+	_slipstream_poll_accumulator_s = fmod(_slipstream_poll_accumulator_s, poll_interval)
+	var found: bool = false
+	if slipstream_enabled and _forward_speed >= slipstream_min_speed:
+		var forward: Vector3 = _flat_forward()
+		var right: Vector3 = _flat_right()
+		for other_variant: Variant in get_tree().get_nodes_in_group("kart_vehicles"):
+			var other := other_variant as Node3D
+			if other == null or other == self:
+				continue
+			var rel: Vector3 = other.global_position - global_position
+			var ahead_m: float = rel.dot(forward)
+			if ahead_m < 2.0 or ahead_m > slipstream_range_m:
+				continue
+			if absf(rel.dot(right)) > slipstream_width_m:
+				continue
+			found = true
+			break
+	is_slipstreaming = found
+	if is_slipstreaming and not _was_slipstreaming:
+		slipstream_started.emit()
+	elif not is_slipstreaming and _was_slipstreaming:
+		slipstream_ended.emit()
+	_was_slipstreaming = is_slipstreaming
+
+
 func _planar_speed_cap(current_gear_speed_limit: float) -> float:
 	var safe_cap: float = maxf(minf(current_gear_speed_limit, maxf(_finite_or(max_speed, 1.0), 1.0)), 1.0)
 	if is_drift_boost_active():
 		safe_cap *= 1.0 + clampf(_finite_or(drift_boost_speed_bonus_ratio, 0.0), 0.0, 0.5)
+	if is_slipstreaming:
+		safe_cap *= 1.0 + clampf(_finite_or(slipstream_speed_bonus_ratio, 0.0), 0.0, 0.5)
 	if _forward_speed < 0.0:
 		safe_cap = maxf(_finite_or(reverse_speed, 1.0), 1.0)
 	if is_drifting:
@@ -746,6 +829,11 @@ func _apply_mesh_color(path: String, color: Color, roughness: float) -> void:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = roughness
+	material.metallic = 0.35
+	material.metallic_specular = 0.65
+	material.clearcoat_enabled = true
+	material.clearcoat = 0.75
+	material.clearcoat_roughness = 0.22
 	mesh_node.material_override = material
 
 

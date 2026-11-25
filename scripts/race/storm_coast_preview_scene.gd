@@ -29,6 +29,11 @@ const RaceConfigScript := preload("res://scripts/race/race_config.gd")
 @export_range(-0.5, 1.5, 0.05) var respawn_vertical_offset_m: float = -0.08
 @export var print_respawn_events: bool = false
 
+@export_category("Adaptive Quality")
+@export var auto_quality_enabled: bool = true
+@export_range(20.0, 59.0, 1.0) var auto_quality_min_fps: float = 45.0
+@export_range(0.5, 5.0, 0.25) var auto_quality_window_s: float = 2.5
+
 @export_category("Respawn Feedback")
 @export var respawn_fade_enabled: bool = true
 @export_range(0.05, 1.5, 0.05) var respawn_fade_in_s: float = 0.45
@@ -48,6 +53,12 @@ var _track_safety_poll_accumulator_s: float = 0.0
 var _respawn_fade_rect: ColorRect = null
 var _respawn_fade_tween: Tween = null
 var _respawn_sting_player: AudioStreamPlayer = null
+var _quality_step: int = 0
+var _quality_window_s: float = 0.0
+var _quality_frames: int = 0
+var _quality_good_windows: int = 0
+var _world_environment: WorldEnvironment = null
+var _sun_light: DirectionalLight3D = null
 
 
 func _ready() -> void:
@@ -55,6 +66,7 @@ func _ready() -> void:
 
 
 func _setup_preview_scene() -> void:
+	_setup_adaptive_quality()
 	_resolve_nodes()
 	_apply_session_configuration()
 	_regenerate_track()
@@ -69,6 +81,62 @@ func _setup_preview_scene() -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_track_safety(delta)
+
+
+func _process(delta: float) -> void:
+	_update_adaptive_quality(delta)
+
+
+func _setup_adaptive_quality() -> void:
+	_world_environment = get_node_or_null("World/WorldEnvironment") as WorldEnvironment
+	_sun_light = get_node_or_null("World/Sun") as DirectionalLight3D
+	if OS.has_feature("android"):
+		_quality_step = 2
+	_apply_quality_step()
+
+
+func _quality_floor_step() -> int:
+	return 2 if OS.has_feature("android") else 0
+
+
+func _update_adaptive_quality(delta: float) -> void:
+	if not auto_quality_enabled or _world_environment == null:
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	_quality_window_s += delta
+	_quality_frames += 1
+	if _quality_window_s < maxf(auto_quality_window_s, 0.5):
+		return
+	var avg_fps: float = float(_quality_frames) / maxf(_quality_window_s, 0.001)
+	_quality_window_s = 0.0
+	_quality_frames = 0
+	if avg_fps < auto_quality_min_fps and _quality_step < 4:
+		_quality_step += 1
+		_quality_good_windows = 0
+		_apply_quality_step()
+	elif avg_fps > auto_quality_min_fps + 13.0:
+		_quality_good_windows += 1
+		if _quality_good_windows >= 2 and _quality_step > _quality_floor_step():
+			_quality_step -= 1
+			_quality_good_windows = 0
+			_apply_quality_step()
+	else:
+		_quality_good_windows = 0
+
+
+func _apply_quality_step() -> void:
+	if _world_environment == null or _world_environment.environment == null:
+		return
+	var env: Environment = _world_environment.environment
+	env.volumetric_fog_enabled = _quality_step < 1
+	env.ssao_enabled = _quality_step < 2
+	env.ssr_enabled = _quality_step < 3
+	if _sun_light != null:
+		_sun_light.directional_shadow_max_distance = 200.0 if _quality_step >= 3 else 320.0
+	var viewport: Viewport = get_viewport()
+	if viewport != null:
+		viewport.scaling_3d_scale = 0.8 if _quality_step >= 4 else 1.0
 
 
 func _resolve_nodes() -> void:
