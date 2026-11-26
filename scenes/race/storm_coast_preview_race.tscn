@@ -15,7 +15,7 @@
 [ext_resource type="Script" uid="uid://ifa13ytuiofq" path="res://scripts/ui/race_hud.gd" id="13_race_hud"]
 [ext_resource type="Script" uid="uid://uk7esavwrjs8" path="res://scripts/ui/race_flow_overlay.gd" id="14_flow_overlay"]
 [ext_resource type="PackedScene" uid="uid://jbhpsjba2hgg" path="res://assets/environment/generated_grandstand_hunyuan.glb" id="15_grandstand"]
-[ext_resource type="Texture2D" uid="uid://bdhj1j3f4eubu" path="res://assets/environment/sky/evening_road_01_puresky_polyhaven.jpg" id="16_sky_panorama"]
+[ext_resource type="Texture2D" uid="uid://d461ajdnhp4p" path="res://assets/environment/sky/storm_coast_sunset_higgsfield.png" id="16_sky_panorama"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_storm_coast_preview"]
 panorama = ExtResource("16_sky_panorama")

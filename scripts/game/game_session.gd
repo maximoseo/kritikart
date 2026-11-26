@@ -148,7 +148,7 @@ const TRACK_OPTIONS: Array[Dictionary] = [
 		"environment": &"coastal_mountain",
 		"lap_count": 1,
 		"target_length_m": 2200.0,
-		"preview_texture_path": "res://assets/ui/figma_tracks/figma_track_speedway.jpg",
+		"preview_texture_path": "res://assets/ui/figma_tracks/figma_track_speedway_hf.jpg",
 		"is_available": true,
 		"locked": false,
 	},
