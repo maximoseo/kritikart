@@ -18,7 +18,7 @@ var _npc_cars_root: Node = null
 
 
 func _ready() -> void:
-	call_deferred("_setup_showcase_race")
+	_setup_showcase_race()
 
 
 func _setup_showcase_race() -> void:

@@ -62,7 +62,7 @@ var _sun_light: DirectionalLight3D = null
 
 
 func _ready() -> void:
-	call_deferred("_setup_preview_scene")
+	_setup_preview_scene()
 
 
 func _setup_preview_scene() -> void:
